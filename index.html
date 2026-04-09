@@ -205,6 +205,10 @@ const CONFIG = {
         <input type="text" id="f-name" placeholder="Full name">
       </div>
       <div class="form-row">
+        <label class="form-label">Your email</label>
+        <input type="email" id="f-email" placeholder="your@email.com">
+      </div>
+      <div class="form-row">
         <label class="form-label">Facility</label>
         <select id="f-facility">
           <option value="">Select facility...</option>
@@ -518,13 +522,14 @@ function updateStats(error = false) {
 // ─── SUBMIT TICKET ────────────────────────────────────────
 async function submitTicket() {
   const name     = document.getElementById("f-name").value.trim();
+  const email    = document.getElementById("f-email").value.trim();
   const facility = document.getElementById("f-facility").value;
   const tool     = document.getElementById("f-tool").value;
   const subject  = document.getElementById("f-subject").value.trim();
   const issue    = document.getElementById("f-issue").value.trim();
   const priority = document.getElementById("f-priority").value;
 
-  if (!name || !facility || !tool || !subject || !issue) {
+  if (!name || !email || !facility || !tool || !subject || !issue) {
     showToast("Please fill in all fields.", "error"); return;
   }
 
@@ -537,16 +542,15 @@ async function submitTicket() {
 
   try {
     await atPost({
-      "Name":           name,
-      "Facility":       facility,
-      "Tool":           tool,
       "Subject":        subject,
+      "Email":          email,
       "Issue":          issue,
       "Priority":       priority,
       "Status":         "Open",
       "Date Submitted": dateStr
     });
     document.getElementById("f-name").value    = "";
+    document.getElementById("f-email").value   = "";
     document.getElementById("f-facility").value = "";
     document.getElementById("f-tool").value    = "";
     document.getElementById("f-subject").value = "";
