@@ -175,11 +175,6 @@ const CONFIG = {
 
 <div class="hub">
 
-  <div id="config-banner">
-    ⚠️ <strong>Setup required:</strong> Open this file and fill in your
-    <a href="https://airtable.com/create/tokens" target="_blank">Airtable token</a>,
-    Base ID, and Anthropic API key in the <code>CONFIG</code> block at the top of the file.
-  </div>
 
   <div class="header">
     <div class="header-left">
@@ -341,7 +336,6 @@ let activeTicket = null;
 
 // ─── INIT ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  checkConfig();
   renderTools();
   loadTickets();
   setLastUpdated();
