@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Freedom Behavioral Health — Technology Hub</title>
+<style>
+  /* ── CONFIG BANNER ─────────────────────────────────────── */
+  #config-banner{display:none;background:#fef3cd;border:1px solid #f0c040;border-radius:8px;padding:12px 16px;margin-bottom:1rem;font-size:13px;color:#7a5800}
+  #config-banner a{color:#7a5800;font-weight:600}
+
+  /* ── RESET & BASE ──────────────────────────────────────── */
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;min-height:100vh;font-size:14px}
+  a{text-decoration:none}
+
+  /* ── LAYOUT ────────────────────────────────────────────── */
+  .hub{max-width:960px;margin:0 auto;padding:1.5rem 1rem 3rem}
+  .header{margin-bottom:1.75rem;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px}
+  .header-left h1{font-size:20px;font-weight:600;color:#1a1a1a}
+  .header-left p{font-size:13px;color:#666;margin-top:3px}
+  .header-right{font-size:12px;color:#888;text-align:right}
+
+  /* ── SECTION LABEL ─────────────────────────────────────── */
+  .section-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+
+  /* ── TOOL CARDS ────────────────────────────────────────── */
+  .tools-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:1.75rem}
+  .tool-card{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;transition:box-shadow .15s,border-color .15s}
+  .tool-card:hover{border-color:#bbb;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .tool-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px}
+  .tool-name{font-size:13px;font-weight:600;color:#1a1a1a}
+  .tool-desc{font-size:11px;color:#888;line-height:1.4}
+
+  /* ── MAIN GRID ─────────────────────────────────────────── */
+  .main-grid{display:grid;grid-template-columns:1fr 1.1fr;gap:1rem;align-items:start}
+  @media(max-width:640px){.main-grid{grid-template-columns:1fr}}
+
+  /* ── CARDS ─────────────────────────────────────────────── */
+  .card{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:1.25rem}
+
+  /* ── FORM ELEMENTS ─────────────────────────────────────── */
+  .form-row{margin-bottom:10px}
+  .form-label{font-size:12px;color:#555;margin-bottom:5px;display:block;font-weight:500}
+  input,select,textarea{width:100%;border:1px solid #ddd;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fff;color:#1a1a1a;outline:none;transition:border-color .15s}
+  input:focus,select:focus,textarea:focus{border-color:#888}
+  textarea{resize:vertical;min-height:82px;line-height:1.5}
+
+  /* ── BUTTONS ────────────────────────────────────────────── */
+  .btn{width:100%;padding:9px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:13px;font-weight:500;color:#1a1a1a;transition:background .15s;font-family:inherit}
+  .btn:hover{background:#f5f5f3}
+  .btn:active{transform:scale(.99)}
+  .btn-primary{background:#185FA5;color:#fff;border-color:#185FA5}
+  .btn-primary:hover{background:#0d4f8f}
+  .btn-primary:disabled{opacity:.6;cursor:not-allowed;transform:none}
+  .btn-ai{background:#534AB7;color:#fff;border-color:#534AB7;margin-top:10px}
+  .btn-ai:hover{background:#3C3489}
+  .btn-ai:disabled{opacity:.6;cursor:not-allowed;transform:none}
+  .btn-sm{width:auto;padding:5px 12px;font-size:12px}
+  .btn-danger{background:#fff;color:#A32D2D;border-color:#f0b0b0}
+  .btn-danger:hover{background:#fcebeb}
+
+  /* ── STAT ROW ───────────────────────────────────────────── */
+  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
+  .stat{background:#f5f5f3;border-radius:8px;padding:10px;text-align:center}
+  .stat-num{font-size:24px;font-weight:600;line-height:1}
+  .stat-lbl{font-size:11px;color:#888;margin-top:3px}
+  .num-open{color:#185FA5}
+  .num-progress{color:#BA7517}
+  .num-closed{color:#3B6D11}
+
+  /* ── TICKET LIST ────────────────────────────────────────── */
+  .list-controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap}
+  .ticket-list{display:flex;flex-direction:column;gap:7px;max-height:280px;overflow-y:auto;padding-right:2px}
+  .ticket-list::-webkit-scrollbar{width:4px}
+  .ticket-list::-webkit-scrollbar-track{background:transparent}
+  .ticket-list::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px}
+  .ticket-item{border:1px solid #e5e5e3;border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .12s}
+  .ticket-item:hover{border-color:#bbb}
+  .ticket-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+  .ticket-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+  .ticket-snippet{font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ticket-meta{font-size:11px;color:#aaa;margin-top:4px}
+
+  /* ── BADGES ─────────────────────────────────────────────── */
+  .badge{font-size:10px;padding:2px 9px;border-radius:20px;font-weight:600;white-space:nowrap}
+  .badge-open{background:#E6F1FB;color:#185FA5}
+  .badge-progress{background:#FAEEDA;color:#BA7517}
+  .badge-closed{background:#EAF3DE;color:#3B6D11}
+  .badge-urgent{background:#FCEBEB;color:#A32D2D}
+  .badge-high{background:#FAEEDA;color:#854F0B}
+  .badge-medium{background:#E6F1FB;color:#185FA5}
+  .badge-low{background:#f5f5f3;color:#666}
+
+  /* ── EMPTY STATE ─────────────────────────────────────────── */
+  .empty-state{text-align:center;padding:2rem 1rem;color:#aaa;font-size:13px}
+
+  /* ── AI SECTION ─────────────────────────────────────────── */
+  .ai-section{border-top:1px solid #e5e5e3;padding-top:1rem;margin-top:.75rem}
+  .ai-output{font-size:12px;color:#444;line-height:1.7;background:#f9f9f8;border:1px solid #e5e5e3;border-radius:8px;padding:12px;margin-top:8px;white-space:pre-wrap;display:none;max-height:220px;overflow-y:auto}
+
+  /* ── MODAL ──────────────────────────────────────────────── */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:1rem}
+  .modal-overlay.show{display:flex}
+  .modal{background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+  .modal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem}
+  .modal-title{font-size:16px;font-weight:600}
+  .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:#888;line-height:1;padding:0}
+  .modal-close:hover{color:#1a1a1a}
+  .modal-meta{font-size:12px;color:#888;margin-bottom:1rem;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .modal-body{font-size:13px;color:#444;line-height:1.7;margin-bottom:1.25rem;background:#f9f9f8;border-radius:8px;padding:12px;border:1px solid #e5e5e3}
+  .modal-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* ── DROPDOWN ───────────────────────────────────────────── */
+  .dropdown-card{cursor:pointer;position:relative;user-select:none}
+  .chevron{font-size:12px;color:#888;transition:transform .2s;display:inline-block}
+  .dropdown-card.open .chevron{transform:rotate(180deg)}
+  .dropdown-menu{display:none;flex-direction:column;margin-top:8px;border-top:1px solid #e5e5e3;padding-top:8px;gap:2px}
+  .dropdown-card.open .dropdown-menu{display:flex}
+  .dropdown-item{font-size:12px;color:#185FA5;padding:5px 8px;border-radius:6px;transition:background .12s;text-decoration:none}
+  .dropdown-item:hover{background:#E6F1FB}
+  .spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-row{text-align:center;padding:1.5rem;color:#aaa;font-size:13px}
+
+  /* ── TOAST ──────────────────────────────────────────────── */
+  .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:200;max-width:280px}
+  .toast.show{opacity:1}
+  .toast.error{background:#A32D2D}
+  .toast.success{background:#3B6D11}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     CONFIGURATION — FILL THESE IN BEFORE DEPLOYING
+     ═══════════════════════════════════════════════ -->
+<script>
+const CONFIG = {
+  // ── AIRTABLE ─────────────────────────────────────
+  // 1. Create an Airtable base called "FBH Support Tickets"
+  // 2. Add a table called "Tickets" with these fields:
+  //    Name (text), Tool (single select), Issue (long text),
+  //    Priority (single select), Status (single select), Submitted (date)
+  // 3. Go to airtable.com/create/tokens → create a Personal Access Token
+  //    with scopes: data.records:read, data.records:write
+  //    and access to your base
+  // 4. Find your Base ID in the URL: airtable.com/appXXXXXXXX/...
+  AIRTABLE_TOKEN: 'patz8kSMjhVRGMzp6.3aa05554e02233d38e547fba584b4d047385aee6af6ff06758256b813a840488',
+  AIRTABLE_BASE_ID: 'appOQI2Im5XebeIyg',
+  AIRTABLE_TABLE: 'tblEMz0BecYmu48y0',
+
+  // ── ANTHROPIC ────────────────────────────────────
+  // Your Claude API key for the AI summary feature
+  ANTHROPIC_KEY: 'YOUR_ANTHROPIC_API_KEY',
+
+  // ── TOOL LINKS ───────────────────────────────────
+  TOOLS: [
+    {
+      name:'BlackOps', desc:'Operations CRM', icon:'🖥', bg:'#E6F1FB', dropdown: true,
+      locations:[
+        'Monroe','Magnolia','Bastrop','Bunkie','Minden',
+        'Dequincy','Plainview','Greenville','Villeplatte',
+        'Ferriday','Leesville','LakeCharles'
+      ]
+    },
+    { name:'Broken Process', url:'https://freedombehavioral.vercel.app',  desc:'Report broken workflows',  icon:'⚠️', bg:'#FAEEDA' },
+    { name:'RAP',            url:'https://rap.freedomhc.com',              desc:'Digital RAP system',       icon:'📋', bg:'#EAF3DE' },
+    { name:'PIP',            url:'https://pip.v8techco.com',               desc:'Performance improvement',  icon:'📈', bg:'#EEEDFE' },
+    { name:'POP',            url:'https://freedom.v8techco.com',           desc:'Outcomes & planning',      icon:'📊', bg:'#FBEAF0' },
+  ]
+};
+</script>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="hub">
+
+  <div id="config-banner">
+    ⚠️ <strong>Setup required:</strong> Open this file and fill in your
+    <a href="https://airtable.com/create/tokens" target="_blank">Airtable token</a>,
+    Base ID, and Anthropic API key in the <code>CONFIG</code> block at the top of the file.
+  </div>
+
+  <div class="header">
+    <div class="header-left">
+      <h1>Freedom Behavioral Health — Technology Hub</h1>
+      <p>Quick access to tools &amp; support ticket management</p>
+    </div>
+    <div class="header-right" id="last-updated"></div>
+  </div>
+
+  <!-- TOOL QUICK LINKS -->
+  <div class="section-label">Tools &amp; Applications</div>
+  <div class="tools-grid" id="tools-grid"></div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- LEFT: SUBMIT TICKET -->
+    <div class="card">
+      <div class="section-label" style="margin-bottom:14px">Submit a Support Ticket</div>
+
+      <div class="form-row">
+        <label class="form-label">Your name</label>
+        <input type="text" id="f-name" placeholder="Full name">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Facility</label>
+        <select id="f-facility">
+          <option value="">Select facility...</option>
+          <option>Monroe</option>
+          <option>Magnolia</option>
+          <option>Bastrop</option>
+          <option>Bunkie</option>
+          <option>Minden</option>
+          <option>Dequincy</option>
+          <option>Plainview</option>
+          <option>Greenville</option>
+          <option>Ville Platte</option>
+          <option>Ferriday</option>
+          <option>Leesville</option>
+          <option>Lake Charles</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Tool / system</label>
+        <select id="f-tool">
+          <option value="">Select a tool...</option>
+          <option>BlackOps</option>
+          <option>Broken Process</option>
+          <option>RAP</option>
+          <option>PIP</option>
+          <option>POP</option>
+          <option>Other / General IT</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Subject</label>
+        <input type="text" id="f-subject" placeholder="Brief summary of the issue">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Issue description</label>
+        <textarea id="f-issue" placeholder="Describe the problem in detail..."></textarea>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Priority</label>
+        <select id="f-priority">
+          <option value="Low">Low — not blocking work</option>
+          <option value="Medium" selected>Medium — slowing work down</option>
+          <option value="High">High — blocking multiple people</option>
+          <option value="Critical">Critical — system down</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary" id="submit-btn" onclick="submitTicket()">Submit Ticket</button>
+    </div>
+
+    <!-- RIGHT: TICKET DASHBOARD -->
+    <div class="card">
+      <!-- Stats -->
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num num-open" id="cnt-open">—</div>
+          <div class="stat-lbl">Open</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num num-progress" id="cnt-progress">—</div>
+          <div class="stat-lbl">In Progress</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num num-closed" id="cnt-closed">—</div>
+          <div class="stat-lbl">Closed</div>
+        </div>
+      </div>
+
+      <!-- List controls -->
+      <div class="list-controls">
+        <div class="section-label" style="margin:0">Recent Tickets</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="filter-status" style="width:auto;font-size:12px;padding:4px 8px" onchange="loadTickets()">
+            <option value="">All statuses</option>
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Closed">Closed</option>
+          </select>
+          <button class="btn btn-sm" onclick="loadTickets()" title="Refresh">↻</button>
+        </div>
+      </div>
+
+      <div class="ticket-list" id="ticket-list">
+        <div class="loading-row">Loading tickets...</div>
+      </div>
+
+      <!-- AI Summary -->
+      <div class="ai-section">
+        <button class="btn btn-ai" id="ai-btn" onclick="runAISummary()">
+          <span class="spinner" id="ai-spinner" style="display:none"></span>AI Triage Summary ↗
+        </button>
+        <div class="ai-output" id="ai-output"></div>
+      </div>
+    </div>
+
+  </div><!-- /main-grid -->
+</div><!-- /hub -->
+
+<!-- TICKET DETAIL MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title"></div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-meta" id="modal-meta"></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="form-row">
+      <label class="form-label">Update status</label>
+      <select id="modal-status" onchange="updateTicketStatus()">
+        <option value="Open">Open</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Closed">Closed</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-sm btn-danger" onclick="deleteTicket()">Delete ticket</button>
+      <button class="btn btn-sm btn-primary" onclick="closeModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── STATE ──────────────────────────────────────────────
+let allTickets = [];
+let activeTicket = null;
+
+// ─── INIT ────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  checkConfig();
+  renderTools();
+  loadTickets();
+  setLastUpdated();
+});
+
+function checkConfig() {
+  const missing = CONFIG.AIRTABLE_TOKEN === 'YOUR_AIRTABLE_PERSONAL_ACCESS_TOKEN'
+    || CONFIG.AIRTABLE_BASE_ID === 'YOUR_BASE_ID'
+    || CONFIG.ANTHROPIC_KEY === 'YOUR_ANTHROPIC_API_KEY';
+  if (missing) document.getElementById('config-banner').style.display = 'block';
+}
+
+function setLastUpdated() {
+  const now = new Date();
+  document.getElementById('last-updated').textContent =
+    now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) +
+    ' · ' + now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+// ─── RENDER TOOL CARDS ────────────────────────────────────
+function renderTools() {
+  const grid = document.getElementById('tools-grid');
+  grid.innerHTML = CONFIG.TOOLS.map(t => {
+    if (t.dropdown) {
+      const items = t.locations.map(loc => {
+        const slug = loc.toLowerCase().replace(/\s/g,'');
+        const label = loc.replace(/([A-Z])/g, ' $1').trim();
+        return `<a class="dropdown-item" href="https://${slug}.blkops.com" target="_blank" rel="noopener">${label}</a>`;
+      }).join('');
+      return `
+        <div class="tool-card dropdown-card" onclick="toggleDropdown(event,this)">
+          <div class="tool-icon" style="background:${t.bg}">${t.icon}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="tool-name">${t.name}</div>
+            <span class="chevron">▾</span>
+          </div>
+          <div class="tool-desc">${t.desc}</div>
+          <div class="dropdown-menu">${items}</div>
+        </div>
+      `;
+    }
+    return `
+      <a class="tool-card" href="${t.url}" target="_blank" rel="noopener">
+        <div class="tool-icon" style="background:${t.bg}">${t.icon}</div>
+        <div class="tool-name">${t.name}</div>
+        <div class="tool-desc">${t.desc}</div>
+      </a>
+    `;
+  }).join('');
+}
+
+function toggleDropdown(e, card) {
+  e.stopPropagation();
+  const isOpen = card.classList.contains('open');
+  document.querySelectorAll('.dropdown-card.open').forEach(c => c.classList.remove('open'));
+  if (!isOpen) card.classList.add('open');
+}
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.dropdown-card.open').forEach(c => c.classList.remove('open'));
+});
+
+// ─── AIRTABLE API HELPERS ─────────────────────────────────
+const AT_BASE = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CONFIG.AIRTABLE_TABLE)}`;
+const AT_HEADERS = {
+  'Authorization': `Bearer ${CONFIG.AIRTABLE_TOKEN}`,
+  'Content-Type': 'application/json'
+};
+
+async function atGet(params = '') {
+  const url = AT_BASE + (params ? '?' + params : '');
+  let res;
+  try {
+    res = await fetch(url, { headers: AT_HEADERS });
+  } catch (e) {
+    throw new Error(`Network error — if opening as a local file, host it on a server instead. (${e.message})`);
+  }
+  if (res.status === 401) throw new Error('Airtable 401 — token is invalid or missing. Check AIRTABLE_TOKEN in CONFIG.');
+  if (res.status === 403) throw new Error('Airtable 403 — token does not have access to this base. Re-create the token and grant access to appOQI2Im5XebeIyg.');
+  if (res.status === 404) throw new Error('Airtable 404 — base or table not found. Check AIRTABLE_BASE_ID and AIRTABLE_TABLE.');
+  if (!res.ok) { const t = await res.text(); throw new Error(`Airtable ${res.status}: ${t}`); }
+  return res.json();
+}
+
+async function atPost(fields) {
+  let res;
+  try {
+    res = await fetch(AT_BASE, { method:'POST', headers:AT_HEADERS, body:JSON.stringify({fields}) });
+  } catch(e) {
+    throw new Error(`Network error — ${e.message}`);
+  }
+  if (res.status === 401) throw new Error('Airtable 401 — invalid token.');
+  if (res.status === 403) throw new Error('Airtable 403 — token lacks write access to this base.');
+  if (res.status === 422) { const t = await res.text(); throw new Error(`Airtable 422 — field name mismatch. Check your column names match exactly: Name, Tool, Issue, Priority, Status, Submitted. Raw: ${t}`); }
+  if (!res.ok) { const t = await res.text(); throw new Error(`Airtable ${res.status}: ${t}`); }
+  return res.json();
+}
+
+async function atPatch(id, fields) {
+  const res = await fetch(`${AT_BASE}/${id}`, {
+    method: 'PATCH',
+    headers: AT_HEADERS,
+    body: JSON.stringify({ fields })
+  });
+  if (!res.ok) throw new Error(`Airtable error ${res.status}`);
+  return res.json();
+}
+
+async function atDelete(id) {
+  const res = await fetch(`${AT_BASE}/${id}`, {
+    method: 'DELETE',
+    headers: AT_HEADERS
+  });
+  if (!res.ok) throw new Error(`Airtable error ${res.status}`);
+  return res.json();
+}
+
+// ─── LOAD TICKETS ─────────────────────────────────────────
+async function loadTickets() {
+  const listEl = document.getElementById('ticket-list');
+  listEl.innerHTML = '<div class="loading-row">Loading...</div>';
+
+  try {
+    const statusFilter = document.getElementById('filter-status').value;
+    let params = 'sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=50';
+    if (statusFilter) {
+      params += `&filterByFormula=${encodeURIComponent(`{Status}="${statusFilter}"`)}`;
+    }
+    const data = await atGet(params);
+    allTickets = data.records || [];
+    renderTicketList();
+    updateStats();
+    setLastUpdated();
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty-state" style="text-align:left;padding:1rem"><strong>Connection error</strong><br><small style="color:#A32D2D">${e.message}</small></div>`;
+    updateStats(true);
+  }
+}
+
+// ─── RENDER TICKET LIST ───────────────────────────────────
+function renderTicketList() {
+  const listEl = document.getElementById('ticket-list');
+  if (!allTickets.length) {
+    listEl.innerHTML = '<div class="empty-state">No tickets found.</div>';
+    return;
+  }
+  listEl.innerHTML = allTickets.map(r => {
+    const f = r.fields;
+    return `
+      <div class="ticket-item" onclick="openModal('${r.id}')">
+        <div class="ticket-header">
+          <div class="ticket-title">${f.Tool || 'General'} — ${f.Facility || ''}</div>
+          <span class="badge ${badgeStatus(f.Status)}">${f.Status || 'Open'}</span>
+        </div>
+        <div class="ticket-snippet">${f.Subject || ''} — ${(f['Issue']||'').slice(0,60)}${(f['Issue']||'').length>60?'…':''}</div>
+        <div class="ticket-meta">${f['Date Submitted'] ? new Date(f['Date Submitted']).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority || 'Medium'}</span></div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── STATS ────────────────────────────────────────────────
+function updateStats(error = false) {
+  if (error) {
+    ['cnt-open','cnt-progress','cnt-closed'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+    return;
+  }
+  document.getElementById('cnt-open').textContent =
+    allTickets.filter(r => r.fields.Status === 'Open').length;
+  document.getElementById('cnt-progress').textContent =
+    allTickets.filter(r => r.fields.Status === 'In Progress').length;
+  document.getElementById('cnt-closed').textContent =
+    allTickets.filter(r => r.fields.Status === 'Closed').length;
+}
+
+// ─── SUBMIT TICKET ────────────────────────────────────────
+async function submitTicket() {
+  const name     = document.getElementById("f-name").value.trim();
+  const facility = document.getElementById("f-facility").value;
+  const tool     = document.getElementById("f-tool").value;
+  const subject  = document.getElementById("f-subject").value.trim();
+  const issue    = document.getElementById("f-issue").value.trim();
+  const priority = document.getElementById("f-priority").value;
+
+  if (!name || !facility || !tool || !subject || !issue) {
+    showToast("Please fill in all fields.", "error"); return;
+  }
+
+  const btn = document.getElementById("submit-btn");
+  btn.disabled = true;
+  btn.textContent = "Submitting...";
+
+  const now = new Date();
+  const dateStr = now.toISOString().split("T")[0];
+
+  try {
+    await atPost({
+      "Name":           name,
+      "Facility":       facility,
+      "Tool":           tool,
+      "Subject":        subject,
+      "Issue":          issue,
+      "Priority":       priority,
+      "Status":         "Open",
+      "Assigned Staff": name,
+      "Date Submitted": dateStr
+    });
+    document.getElementById("f-name").value    = "";
+    document.getElementById("f-facility").value = "";
+    document.getElementById("f-tool").value    = "";
+    document.getElementById("f-subject").value = "";
+    document.getElementById("f-issue").value   = "";
+    document.getElementById("f-priority").value = "Medium";
+    showToast("Ticket submitted successfully!", "success");
+    await loadTickets();
+  } catch (e) {
+    showToast(e.message, "error");
+    console.error(e);
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Submit Ticket";
+}
+
+// ─── MODAL ────────────────────────────────────────────────
+function openModal(id) {
+  activeTicket = allTickets.find(r => r.id === id);
+  if (!activeTicket) return;
+  const f = activeTicket.fields;
+  document.getElementById('modal-title').textContent = (f.Subject || f.Tool || 'Support Ticket') + ' — ' + (f.Facility || '');
+  document.getElementById('modal-meta').innerHTML = `
+    <span class="badge ${badgeStatus(f.Status)}">${f.Status || 'Open'}</span>
+    <span class="badge ${badgePriority(f.Priority)}">${f.Priority || 'Medium'} priority</span>
+    <span>${f.Facility || ''} · ${f['Date Submitted'] ? new Date(f['Date Submitted']).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</span>
+  `;
+  document.getElementById('modal-body').innerHTML = '<strong>'+( f.Tool||'')+' — '+(f['Assigned Staff']||'')+' </strong><br><br>'+(f.Issue||'');
+  document.getElementById('modal-status').value = f.Status || 'Open';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('show');
+  activeTicket = null;
+}
+
+async function updateTicketStatus() {
+  if (!activeTicket) return;
+  const newStatus = document.getElementById('modal-status').value;
+  try {
+    await atPatch(activeTicket.id, { Status: newStatus });
+    activeTicket.fields.Status = newStatus;
+    document.getElementById('modal-meta').innerHTML = `
+      <span class="badge ${badgeStatus(newStatus)}">${newStatus}</span>
+      <span class="badge ${badgePriority(activeTicket.fields.Priority)}">${activeTicket.fields.Priority || 'Medium'} priority</span>
+      <span>${activeTicket.fields.Facility || ''}</span>
+    `;
+    showToast('Status updated.', 'success');
+    await loadTickets();
+  } catch (e) {
+    showToast('Failed to update status.', 'error');
+  }
+}
+
+async function deleteTicket() {
+  if (!activeTicket) return;
+  if (!confirm('Delete this ticket? This cannot be undone.')) return;
+  try {
+    await atDelete(activeTicket.id);
+    document.getElementById('modal-overlay').classList.remove('show');
+    showToast('Ticket deleted.', 'success');
+    await loadTickets();
+  } catch (e) {
+    showToast('Failed to delete.', 'error');
+  }
+}
+
+// ─── AI SUMMARY ───────────────────────────────────────────
+async function runAISummary() {
+  if (!allTickets.length) { showToast('No tickets to summarize.'); return; }
+
+  const btn = document.getElementById('ai-btn');
+  const spinner = document.getElementById('ai-spinner');
+  const out = document.getElementById('ai-output');
+
+  btn.disabled = true;
+  spinner.style.display = 'inline-block';
+  out.style.display = 'none';
+
+  const ticketSummary = allTickets.map(r => {
+    const f = r.fields;
+    return `[${f.Status}] ${f.Tool} | ${f.Priority} | ${f.Facility} | ${f.Subject} | ${(f.Issue||'').slice(0,100)}`;
+  }).join('\n');
+
+  const open = allTickets.filter(r => r.fields.Status === 'Open').length;
+  const progress = allTickets.filter(r => r.fields.Status === 'In Progress').length;
+  const closed = allTickets.filter(r => r.fields.Status === 'Closed').length;
+  const urgent = allTickets.filter(r => r.fields.Priority === 'Urgent' && r.fields.Status !== 'Closed').length;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CONFIG.ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 800,
+        system: `You are an IT support AI agent for Freedom Behavioral Health, assisting Bren Roberts (CIO/CTO consultant). 
+Your job is to give a concise, executive-level triage summary of open support tickets.
+Format your response with these sections (use plain text, no markdown symbols):
+
+SUMMARY
+One or two sentences on the overall support health.
+
+TICKET COUNTS
+Open: X | In Progress: X | Closed: X | Urgent: X
+
+TOP ISSUES
+List the 2-3 most pressing issues with brief context.
+
+RECOMMENDED ACTIONS
+2-3 specific action items Bren should take today.
+
+Keep total response under 250 words. Be direct and useful.`,
+        messages: [{
+          role: 'user',
+          content: `Here are the current support tickets for Freedom Behavioral Health:\n\n${ticketSummary}\n\nStats: Open: ${open}, In Progress: ${progress}, Closed: ${closed}, Urgent unresolved: ${urgent}.\n\nGive me today's triage summary.`
+        }]
+      })
+    });
+
+    const data = await res.json();
+    const text = data.content?.find(b => b.type === 'text')?.text || 'No response from AI.';
+    out.textContent = text;
+    out.style.display = 'block';
+  } catch (e) {
+    out.textContent = 'Error connecting to AI. Check your Anthropic API key in the CONFIG block.';
+    out.style.display = 'block';
+    console.error(e);
+  }
+
+  btn.disabled = false;
+  spinner.style.display = 'none';
+}
+
+// ─── BADGE HELPERS ────────────────────────────────────────
+function badgeStatus(s) {
+  if (s === 'In Progress') return 'badge-progress';
+  if (s === 'Closed') return 'badge-closed';
+  return 'badge-open';
+}
+
+function badgePriority(p) {
+  if (p === 'Urgent') return 'badge-urgent';
+  if (p === 'High')   return 'badge-high';
+  if (p === 'Low')    return 'badge-low';
+  return 'badge-medium';
+}
+
+// ─── TOAST ────────────────────────────────────────────────
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+</script>
+</body>
+</html>
