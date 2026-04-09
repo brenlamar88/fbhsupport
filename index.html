@@ -269,7 +269,7 @@ const CONFIG = {
         </div>
         <div class="stat">
           <div class="stat-num num-closed" id="cnt-closed">—</div>
-          <div class="stat-lbl">Closed</div>
+          <div class="stat-lbl">Resolved</div>
         </div>
       </div>
 
@@ -281,7 +281,7 @@ const CONFIG = {
             <option value="">All statuses</option>
             <option value="Open">Open</option>
             <option value="In Progress">In Progress</option>
-            <option value="Closed">Closed</option>
+            <option value="Resolved">Resolved</option>
           </select>
           <button class="btn btn-sm" onclick="loadTickets()" title="Refresh">↻</button>
         </div>
@@ -317,7 +317,7 @@ const CONFIG = {
       <select id="modal-status" onchange="updateTicketStatus()">
         <option value="Open">Open</option>
         <option value="In Progress">In Progress</option>
-        <option value="Closed">Closed</option>
+        <option value="Resolved">Resolved</option>
       </select>
     </div>
     <div class="modal-actions">
@@ -512,7 +512,7 @@ function updateStats(error = false) {
   document.getElementById('cnt-progress').textContent =
     allTickets.filter(r => r.fields.Status === 'In Progress').length;
   document.getElementById('cnt-closed').textContent =
-    allTickets.filter(r => r.fields.Status === 'Closed').length;
+    allTickets.filter(r => r.fields.Status === 'Resolved').length;
 }
 
 // ─── SUBMIT TICKET ────────────────────────────────────────
@@ -636,8 +636,8 @@ async function runAISummary() {
 
   const open = allTickets.filter(r => r.fields.Status === 'Open').length;
   const progress = allTickets.filter(r => r.fields.Status === 'In Progress').length;
-  const closed = allTickets.filter(r => r.fields.Status === 'Closed').length;
-  const urgent = allTickets.filter(r => r.fields.Priority === 'Urgent' && r.fields.Status !== 'Closed').length;
+  const closed = allTickets.filter(r => r.fields.Status === 'Resolved').length;
+  const urgent = allTickets.filter(r => r.fields.Priority === 'Urgent' && r.fields.Status !== 'Resolved').length;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -659,7 +659,7 @@ SUMMARY
 One or two sentences on the overall support health.
 
 TICKET COUNTS
-Open: X | In Progress: X | Closed: X | Urgent: X
+Open: X | In Progress: X | Resolved: X | Urgent: X
 
 TOP ISSUES
 List the 2-3 most pressing issues with brief context.
@@ -670,7 +670,7 @@ RECOMMENDED ACTIONS
 Keep total response under 250 words. Be direct and useful.`,
         messages: [{
           role: 'user',
-          content: `Here are the current support tickets for Freedom Behavioral Health:\n\n${ticketSummary}\n\nStats: Open: ${open}, In Progress: ${progress}, Closed: ${closed}, Urgent unresolved: ${urgent}.\n\nGive me today's triage summary.`
+          content: `Here are the current support tickets for Freedom Behavioral Health:\n\n${ticketSummary}\n\nStats: Open: ${open}, In Progress: ${progress}, Resolved: ${closed}, Urgent unresolved: ${urgent}.\n\nGive me today's triage summary.`
         }]
       })
     });
@@ -692,7 +692,7 @@ Keep total response under 250 words. Be direct and useful.`,
 // ─── BADGE HELPERS ────────────────────────────────────────
 function badgeStatus(s) {
   if (s === 'In Progress') return 'badge-progress';
-  if (s === 'Closed') return 'badge-closed';
+  if (s === 'Resolved') return 'badge-closed';
   return 'badge-open';
 }
 
