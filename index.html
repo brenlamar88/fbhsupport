@@ -207,7 +207,6 @@ const CONFIG = {
         <label class="form-label">Facility</label>
         <select id="f-facility">
           <option value="">Select facility...</option>
-          <option>Corporate</option>
           <option>Monroe</option>
           <option>Magnolia</option>
           <option>Bastrop</option>
@@ -231,8 +230,7 @@ const CONFIG = {
           <option>RAP</option>
           <option>PIP</option>
           <option>POP</option>
-          <option>Netsfere</option>
-          <option>Email</option>
+          <option>NetSfere</option>
           <option>Other / General IT</option>
         </select>
       </div>
@@ -463,12 +461,23 @@ async function loadTickets() {
 
   try {
     const statusFilter = document.getElementById('filter-status').value;
-    let params = 'sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=50';
+    let baseParams = 'sort[0][field]=Date Submitted&sort[0][direction]=desc';
     if (statusFilter) {
-      params += `&filterByFormula=${encodeURIComponent(`{Status}="${statusFilter}"`)}`;
+      baseParams += `&filterByFormula=${encodeURIComponent(`{Status}="${statusFilter}"`)}`;
     }
-    const data = await atGet(params);
-    allTickets = data.records || [];
+
+    // Paginate through ALL records using Airtable offset
+    let records = [];
+    let offset = null;
+    do {
+      let params = baseParams;
+      if (offset) params += `&offset=${offset}`;
+      const data = await atGet(params);
+      records = records.concat(data.records || []);
+      offset = data.offset || null;
+    } while (offset);
+
+    allTickets = records;
     renderTicketList();
     updateStats();
     setLastUpdated();
