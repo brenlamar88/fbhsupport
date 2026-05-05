@@ -503,7 +503,7 @@ function renderTicketList() {
           <span class="badge ${badgeStatus(f.Status)}">${f.Status || 'Open'}</span>
         </div>
         <div class="ticket-snippet">${f.Subject || ''} — ${(f['Issue']||'').slice(0,60)}${(f['Issue']||'').length>60?'…':''}</div>
-        <div class="ticket-meta">${f['Date Submitted'] ? new Date(f['Date Submitted']).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority || 'Medium'}</span></div>
+        <div class="ticket-meta">${f['Date Submitted'] ? (d => new Date(d.getTime() + d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])) : ''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority || 'Medium'}</span></div>
       </div>
     `;
   }).join('');
@@ -584,7 +584,7 @@ function openModal(id) {
   document.getElementById('modal-meta').innerHTML = `
     <span class="badge ${badgeStatus(f.Status)}">${f.Status || 'Open'}</span>
     <span class="badge ${badgePriority(f.Priority)}">${f.Priority || 'Medium'} priority</span>
-    <span>${f.Facility || ''} · ${f['Date Submitted'] ? new Date(f['Date Submitted']).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</span>
+    <span>${f.Facility || ''} · ${f['Date Submitted'] ? (d => new Date(d.getTime() + d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])) : ''}</span>
   `;
   document.getElementById('modal-body').innerHTML = '<strong>'+( f.Tool||'')+' — '+(f['Assigned Staff']||'')+' </strong><br><br>'+(f.Issue||'');
   document.getElementById('modal-status').value = f.Status || 'Open';
