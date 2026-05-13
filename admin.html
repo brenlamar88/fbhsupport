@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FBH Admin — Technology Hub</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;min-height:100vh;font-size:14px;overflow-x:hidden}
+  a{text-decoration:none}
+
+  /* ── LOGIN SCREEN ── */
+  .login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem}
+  .login-card{background:#fff;border:1px solid #e5e5e3;border-radius:16px;padding:2.5rem;width:100%;max-width:360px;text-align:center}
+  .login-logo{font-size:32px;margin-bottom:1rem}
+  .login-title{font-size:18px;font-weight:600;margin-bottom:4px}
+  .login-sub{font-size:13px;color:#888;margin-bottom:1.5rem}
+  .login-input{width:100%;border:1px solid #ddd;border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none;transition:border-color .15s;text-align:center;letter-spacing:.05em;margin-bottom:12px}
+  .login-input:focus{border-color:#185FA5;box-shadow:0 0 0 3px rgba(24,95,165,.08)}
+  .login-btn{width:100%;padding:10px;border-radius:8px;border:none;background:#185FA5;color:#fff;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s}
+  .login-btn:hover{background:#0d4f8f}
+  .login-error{font-size:12px;color:#A32D2D;margin-top:8px;display:none}
+  .login-error.show{display:block}
+
+  /* ── DASHBOARD ── */
+  .dashboard{display:none}
+  .dashboard.show{display:block}
+  .hub{max-width:1200px;margin:0 auto;padding:1.5rem 1rem 3rem}
+  .header{margin-bottom:1.75rem;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px}
+  .header-left h1{font-size:20px;font-weight:600;color:#1a1a1a}
+  .header-left p{font-size:13px;color:#666;margin-top:3px}
+  .header-right{display:flex;align-items:center;gap:12px;font-size:12px;color:#888;text-align:right}
+  .admin-badge{background:#185FA5;color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px}
+  .logout-btn{font-size:12px;color:#888;cursor:pointer;border:1px solid #ddd;background:#fff;padding:4px 10px;border-radius:6px;font-family:inherit}
+  .logout-btn:hover{background:#f5f5f3;color:#1a1a1a}
+  .section-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+  .tools-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:1.75rem}
+  .tool-card{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;transition:box-shadow .15s,border-color .15s}
+  .tool-card:hover{border-color:#bbb;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .tool-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px}
+  .tool-name{font-size:13px;font-weight:600;color:#1a1a1a}
+  .tool-desc{font-size:11px;color:#888;line-height:1.4}
+  .card{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:1.25rem;min-width:0;overflow:hidden}
+  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
+  .stat{background:#f5f5f3;border-radius:8px;padding:10px;text-align:center}
+  .stat-num{font-size:24px;font-weight:600;line-height:1}
+  .stat-lbl{font-size:11px;color:#888;margin-top:3px}
+  .num-open{color:#185FA5}
+  .num-progress{color:#BA7517}
+  .num-closed{color:#3B6D11}
+  .list-controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap}
+  .ticket-list{display:flex;flex-direction:column;gap:7px;max-height:520px;overflow-y:auto;padding-right:4px}
+  .ticket-list::-webkit-scrollbar{width:5px}
+  .ticket-list::-webkit-scrollbar-track{background:transparent}
+  .ticket-list::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px}
+  .ticket-item{border:1px solid #e5e5e3;border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .12s}
+  .ticket-item:hover{border-color:#bbb}
+  .ticket-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+  .ticket-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+  .ticket-snippet{font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ticket-meta{font-size:11px;color:#aaa;margin-top:4px}
+  .badge{font-size:10px;padding:2px 9px;border-radius:20px;font-weight:600;white-space:nowrap}
+  .badge-open{background:#E6F1FB;color:#185FA5}
+  .badge-progress{background:#FAEEDA;color:#BA7517}
+  .badge-closed{background:#EAF3DE;color:#3B6D11}
+  .badge-urgent{background:#FCEBEB;color:#A32D2D}
+  .badge-high{background:#FAEEDA;color:#854F0B}
+  .badge-medium{background:#E6F1FB;color:#185FA5}
+  .badge-low{background:#f5f5f3;color:#666}
+  .empty-state{text-align:center;padding:2rem 1rem;color:#aaa;font-size:13px}
+  .ai-section{border-top:1px solid #e5e5e3;padding-top:1rem;margin-top:.75rem}
+  .ai-output{font-size:12px;color:#444;line-height:1.7;background:#f9f9f8;border:1px solid #e5e5e3;border-radius:8px;padding:12px;margin-top:8px;white-space:pre-wrap;display:none;max-height:260px;overflow-y:auto}
+  .btn{width:100%;padding:9px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:13px;font-weight:500;color:#1a1a1a;transition:background .15s;font-family:inherit}
+  .btn:hover{background:#f5f5f3}
+  .btn:active{transform:scale(.99)}
+  .btn-primary{background:#185FA5;color:#fff;border-color:#185FA5}
+  .btn-primary:hover{background:#0d4f8f}
+  .btn-primary:disabled{opacity:.6;cursor:not-allowed;transform:none}
+  .btn-ai{background:#534AB7;color:#fff;border-color:#534AB7;margin-top:10px}
+  .btn-ai:hover{background:#3C3489}
+  .btn-ai:disabled{opacity:.6;cursor:not-allowed;transform:none}
+  .btn-sm{width:auto;padding:5px 12px;font-size:12px}
+  .btn-danger{background:#fff;color:#A32D2D;border-color:#f0b0b0}
+  .btn-danger:hover{background:#fcebeb}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:1rem}
+  .modal-overlay.show{display:flex}
+  .modal{background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+  .modal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem}
+  .modal-title{font-size:16px;font-weight:600}
+  .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:#888;line-height:1;padding:0}
+  .modal-close:hover{color:#1a1a1a}
+  .modal-meta{font-size:12px;color:#888;margin-bottom:1rem;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .modal-body{font-size:13px;color:#444;line-height:1.7;margin-bottom:1.25rem;background:#f9f9f8;border-radius:8px;padding:12px;border:1px solid #e5e5e3}
+  .modal-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .form-row{margin-bottom:10px}
+  .form-label{font-size:12px;color:#555;margin-bottom:5px;display:block;font-weight:500}
+  input,select,textarea{width:100%;border:1px solid #ddd;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fff;color:#1a1a1a;outline:none;transition:border-color .15s}
+  input:focus,select:focus,textarea:focus{border-color:#888}
+  .dropdown-card{cursor:pointer;position:relative;user-select:none}
+  .chevron{font-size:12px;color:#888;transition:transform .2s;display:inline-block}
+  .dropdown-card.open .chevron{transform:rotate(180deg)}
+  .dropdown-menu{display:none;flex-direction:column;margin-top:8px;border-top:1px solid #e5e5e3;padding-top:8px;gap:2px}
+  .dropdown-card.open .dropdown-menu{display:flex}
+  .dropdown-item{font-size:12px;color:#185FA5;padding:5px 8px;border-radius:6px;transition:background .12s;text-decoration:none}
+  .dropdown-item:hover{background:#E6F1FB}
+  .spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-row{text-align:center;padding:1.5rem;color:#aaa;font-size:13px}
+  .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:200;max-width:280px}
+  .toast.show{opacity:1}
+  .toast.error{background:#A32D2D}
+  .toast.success{background:#3B6D11}
+</style>
+</head>
+<body>
+<script>
+const CONFIG = {
+  ADMIN_PASSWORD: 'FBH2020!',
+  AIRTABLE_TOKEN: 'patz8kSMjhVRGMzp6.3aa05554e02233d38e547fba584b4d047385aee6af6ff06758256b813a840488',
+  AIRTABLE_BASE_ID: 'appOQI2Im5XebeIyg',
+  AIRTABLE_TABLE: 'tblEMz0BecYmu48y0',
+  ANTHROPIC_KEY: 'YOUR_ANTHROPIC_API_KEY',
+  TOOLS: [
+    { name:'BlackOps', desc:'Operations CRM', icon:'🖥', bg:'#E6F1FB', dropdown:true, locations:['Monroe','Magnolia','Bastrop','Bunkie','Minden','Dequincy','Plainview','Greenville','Villeplatte','Ferriday','Leesville','LakeCharles'] },
+    { name:'Broken Process', url:'https://freedombehavioral.vercel.app', desc:'Report broken workflows', icon:'⚠️', bg:'#FAEEDA' },
+    { name:'RAP', url:'https://rap.freedomhc.com', desc:'Digital RAP system', icon:'📋', bg:'#EAF3DE' },
+    { name:'PIP', url:'https://pip.v8techco.com', desc:'Performance improvement', icon:'📈', bg:'#EEEDFE' },
+    { name:'POP', url:'https://freedom.v8techco.com', desc:'Outcomes & planning', icon:'📊', bg:'#FBEAF0' },
+  ]
+};
+</script>
+
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🔒</div>
+    <div class="login-title">Admin Access</div>
+    <div class="login-sub">Freedom Behavioral Health — Technology Hub</div>
+    <input type="password" class="login-input" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPassword()">
+    <button class="login-btn" onclick="checkPassword()">Sign In</button>
+    <div class="login-error" id="login-error">Incorrect password. Please try again.</div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard" id="dashboard">
+  <div class="hub">
+    <div class="header">
+      <div class="header-left">
+        <h1>Freedom Behavioral Health — Technology Hub</h1>
+        <p>Admin Dashboard · Full ticket management</p>
+      </div>
+      <div class="header-right">
+        <span id="last-updated"></span>
+        <span class="admin-badge">ADMIN</span>
+        <button class="logout-btn" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <div class="section-label">Tools &amp; Applications</div>
+    <div class="tools-grid" id="tools-grid"></div>
+
+    <div class="card">
+      <div class="stat-row">
+        <div class="stat"><div class="stat-num num-open" id="cnt-open">—</div><div class="stat-lbl">Open</div></div>
+        <div class="stat"><div class="stat-num num-progress" id="cnt-progress">—</div><div class="stat-lbl">In Progress</div></div>
+        <div class="stat"><div class="stat-num num-closed" id="cnt-closed">—</div><div class="stat-lbl">Resolved</div></div>
+      </div>
+      <div class="list-controls">
+        <div class="section-label" style="margin:0">All Tickets</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="filter-status" style="width:auto;font-size:12px;padding:4px 8px" onchange="loadTickets()">
+            <option value="">All statuses</option>
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+          </select>
+          <select id="filter-facility" style="width:auto;font-size:12px;padding:4px 8px" onchange="loadTickets()">
+            <option value="">All facilities</option>
+            <option>Corporate</option><option>Monroe</option><option>Magnolia</option><option>Bastrop</option>
+            <option>Bunkie</option><option>Minden</option><option>Dequincy</option><option>Plainview</option>
+            <option>Greenville</option><option>Ville Platte</option><option>Ferriday</option>
+            <option>Leesville</option><option>Lake Charles</option>
+          </select>
+          <button class="btn btn-sm" onclick="loadTickets()" title="Refresh">↻</button>
+        </div>
+      </div>
+      <div class="ticket-list" id="ticket-list"><div class="loading-row">Loading tickets...</div></div>
+      <div class="ai-section">
+        <button class="btn btn-ai" id="ai-btn" onclick="runAISummary()">
+          <span class="spinner" id="ai-spinner" style="display:none"></span>AI Triage Summary ↗
+        </button>
+        <div class="ai-output" id="ai-output"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TICKET MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header"><div class="modal-title" id="modal-title"></div><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-meta" id="modal-meta"></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="form-row">
+      <label class="form-label">Update status</label>
+      <select id="modal-status" onchange="updateTicketStatus()">
+        <option value="Open">Open</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Resolved">Resolved</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-sm btn-danger" onclick="deleteTicket()">Delete ticket</button>
+      <button class="btn btn-sm btn-primary" onclick="closeModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let allTickets = [], activeTicket = null;
+
+// ── AUTH ──────────────────────────────────────────────────
+function checkPassword() {
+  const val = document.getElementById('pw-input').value;
+  if (val === CONFIG.ADMIN_PASSWORD) {
+    sessionStorage.setItem('fbh_admin', '1');
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').classList.add('show');
+    renderTools();
+    loadTickets();
+    setLastUpdated();
+  } else {
+    document.getElementById('login-error').classList.add('show');
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+
+function logout() {
+  sessionStorage.removeItem('fbh_admin');
+  document.getElementById('dashboard').classList.remove('show');
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('pw-input').value = '';
+  document.getElementById('login-error').classList.remove('show');
+}
+
+// Auto-login if session active
+document.addEventListener('DOMContentLoaded', () => {
+  if (sessionStorage.getItem('fbh_admin') === '1') {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').classList.add('show');
+    renderTools();
+    loadTickets();
+    setLastUpdated();
+  }
+  document.getElementById('pw-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') checkPassword();
+  });
+});
+
+function setLastUpdated() {
+  const now = new Date();
+  document.getElementById('last-updated').textContent =
+    now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) + ' · ' +
+    now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+// ── TOOLS ─────────────────────────────────────────────────
+function renderTools() {
+  const grid = document.getElementById('tools-grid');
+  grid.innerHTML = CONFIG.TOOLS.map(t => {
+    if (t.dropdown) {
+      const items = t.locations.map(loc => {
+        const slug = loc.toLowerCase().replace(/\s/g,'');
+        const label = loc.replace(/([A-Z])/g,' $1').trim();
+        return `<a class="dropdown-item" href="https://${slug}.blkops.com" target="_blank" rel="noopener">${label}</a>`;
+      }).join('');
+      return `<div class="tool-card dropdown-card" onclick="toggleDropdown(event,this)">
+        <div class="tool-icon" style="background:${t.bg}">${t.icon}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="tool-name">${t.name}</div><span class="chevron">▾</span>
+        </div>
+        <div class="tool-desc">${t.desc}</div>
+        <div class="dropdown-menu">${items}</div>
+      </div>`;
+    }
+    return `<a class="tool-card" href="${t.url}" target="_blank" rel="noopener">
+      <div class="tool-icon" style="background:${t.bg}">${t.icon}</div>
+      <div class="tool-name">${t.name}</div>
+      <div class="tool-desc">${t.desc}</div>
+    </a>`;
+  }).join('');
+}
+
+function toggleDropdown(e, card) {
+  e.stopPropagation();
+  const isOpen = card.classList.contains('open');
+  document.querySelectorAll('.dropdown-card.open').forEach(c => c.classList.remove('open'));
+  if (!isOpen) card.classList.add('open');
+}
+document.addEventListener('click', () => { document.querySelectorAll('.dropdown-card.open').forEach(c => c.classList.remove('open')); });
+
+// ── AIRTABLE ──────────────────────────────────────────────
+const AT_BASE = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CONFIG.AIRTABLE_TABLE)}`;
+const AT_HEADERS = { 'Authorization': `Bearer ${CONFIG.AIRTABLE_TOKEN}`, 'Content-Type': 'application/json' };
+
+async function atGet(params='') {
+  const res = await fetch(AT_BASE+(params?'?'+params:''), {headers:AT_HEADERS});
+  if (!res.ok) throw new Error(`Airtable ${res.status}`);
+  return res.json();
+}
+async function atPatch(id, fields) {
+  const res = await fetch(`${AT_BASE}/${id}`, {method:'PATCH',headers:AT_HEADERS,body:JSON.stringify({fields})});
+  if (!res.ok) throw new Error(`Airtable error ${res.status}`);
+  return res.json();
+}
+async function atDelete(id) {
+  const res = await fetch(`${AT_BASE}/${id}`, {method:'DELETE',headers:AT_HEADERS});
+  if (!res.ok) throw new Error(`Airtable error ${res.status}`);
+  return res.json();
+}
+
+// ── LOAD TICKETS ──────────────────────────────────────────
+async function loadTickets() {
+  const listEl = document.getElementById('ticket-list');
+  listEl.innerHTML = '<div class="loading-row">Loading...</div>';
+  try {
+    const sf = document.getElementById('filter-status').value;
+    const ff = document.getElementById('filter-facility').value;
+    let filters = [];
+    if (sf) filters.push(`{Status}="${sf}"`);
+    if (ff) filters.push(`{Facility}="${ff}"`);
+    let bp = 'sort[0][field]=Date Submitted&sort[0][direction]=desc';
+    if (filters.length) bp += `&filterByFormula=${encodeURIComponent(filters.length>1?`AND(${filters.join(',')})`:filters[0])}`;
+    let records=[], offset=null;
+    do {
+      let p=bp; if(offset) p+=`&offset=${offset}`;
+      const data=await atGet(p); records=records.concat(data.records||[]); offset=data.offset||null;
+    } while(offset);
+    allTickets=records; renderTicketList(); updateStats(); setLastUpdated();
+  } catch(e) {
+    listEl.innerHTML=`<div class="empty-state"><strong>Connection error</strong><br><small style="color:#A32D2D">${e.message}</small></div>`;
+    updateStats(true);
+  }
+}
+
+function renderTicketList() {
+  const listEl = document.getElementById('ticket-list');
+  if (!allTickets.length) { listEl.innerHTML='<div class="empty-state">No tickets found.</div>'; return; }
+  listEl.innerHTML = allTickets.map(r => {
+    const f=r.fields;
+    return `<div class="ticket-item" onclick="openModal('${r.id}')">
+      <div class="ticket-header">
+        <div class="ticket-title">${f.Tool||'General'} — ${f.Facility||''}</div>
+        <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
+      </div>
+      <div class="ticket-snippet">${f.Subject||''} — ${(f['Issue']||'').slice(0,80)}${(f['Issue']||'').length>80?'…':''}</div>
+      <div class="ticket-meta">${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'}</span>${f.Email?` · ${f.Email}`:''}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateStats(error=false) {
+  if(error){['cnt-open','cnt-progress','cnt-closed'].forEach(id=>document.getElementById(id).textContent='—');return;}
+  document.getElementById('cnt-open').textContent=allTickets.filter(r=>r.fields.Status==='Open').length;
+  document.getElementById('cnt-progress').textContent=allTickets.filter(r=>r.fields.Status==='In Progress').length;
+  document.getElementById('cnt-closed').textContent=allTickets.filter(r=>r.fields.Status==='Resolved').length;
+}
+
+// ── MODAL ─────────────────────────────────────────────────
+function openModal(id) {
+  activeTicket=allTickets.find(r=>r.id===id); if(!activeTicket)return;
+  const f=activeTicket.fields;
+  document.getElementById('modal-title').textContent=(f.Subject||f.Tool||'Support Ticket')+' — '+(f.Facility||'');
+  document.getElementById('modal-meta').innerHTML=`
+    <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
+    <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'} priority</span>
+    <span>${f.Facility||''}</span>${f.Email?`<span>📧 ${f.Email}</span>`:''}
+    <span>${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''}</span>`;
+  document.getElementById('modal-body').innerHTML='<strong>'+(f.Tool||'')+'</strong><br><br>'+(f.Issue||'');
+  document.getElementById('modal-status').value=f.Status||'Open';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+function closeModal(e) {
+  if(e&&e.target!==document.getElementById('modal-overlay'))return;
+  document.getElementById('modal-overlay').classList.remove('show'); activeTicket=null;
+}
+async function updateTicketStatus() {
+  if(!activeTicket)return;
+  const ns=document.getElementById('modal-status').value;
+  try {
+    await atPatch(activeTicket.id,{Status:ns}); activeTicket.fields.Status=ns;
+    showToast('Status updated.','success'); await loadTickets();
+  } catch(e){showToast('Failed to update.','error');}
+}
+async function deleteTicket() {
+  if(!activeTicket)return;
+  if(!confirm('Delete this ticket? This cannot be undone.'))return;
+  try {
+    await atDelete(activeTicket.id);
+    document.getElementById('modal-overlay').classList.remove('show');
+    showToast('Ticket deleted.','success'); await loadTickets();
+  } catch(e){showToast('Failed to delete.','error');}
+}
+
+// ── AI SUMMARY ────────────────────────────────────────────
+async function runAISummary() {
+  if(!allTickets.length){showToast('No tickets to summarize.');return;}
+  const btn=document.getElementById('ai-btn'),spinner=document.getElementById('ai-spinner'),out=document.getElementById('ai-output');
+  btn.disabled=true; spinner.style.display='inline-block'; out.style.display='none';
+  const ts=allTickets.map(r=>{const f=r.fields;return `[${f.Status}] ${f.Tool} | ${f.Priority} | ${f.Facility} | ${f.Subject} | ${(f.Issue||'').slice(0,100)}`;}).join('\n');
+  const open=allTickets.filter(r=>r.fields.Status==='Open').length;
+  const prog=allTickets.filter(r=>r.fields.Status==='In Progress').length;
+  const closed=allTickets.filter(r=>r.fields.Status==='Resolved').length;
+  const urgent=allTickets.filter(r=>r.fields.Priority==='Urgent'&&r.fields.Status!=='Resolved').length;
+  try {
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':CONFIG.ANTHROPIC_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,
+        system:`You are an IT support AI agent for Freedom Behavioral Health, assisting Bren Roberts (CIO). Give a concise executive-level triage summary. Plain text only, no markdown.\n\nSUMMARY\nOverall support health in 1-2 sentences.\n\nTICKET COUNTS\nOpen: X | In Progress: X | Resolved: X | Urgent: X\n\nTOP ISSUES\n2-3 most pressing issues with brief context.\n\nRECOMMENDED ACTIONS\n2-3 specific action items for today.\n\nKeep under 250 words.`,
+        messages:[{role:'user',content:`Tickets:\n\n${ts}\n\nStats: Open: ${open}, In Progress: ${prog}, Resolved: ${closed}, Urgent: ${urgent}.\n\nGive me today's triage summary.`}]
+      })
+    });
+    const data=await res.json();
+    out.textContent=data.content?.find(b=>b.type==='text')?.text||'No response from AI.';
+    out.style.display='block';
+  } catch(e){out.textContent='Error connecting to AI.';out.style.display='block';}
+  btn.disabled=false; spinner.style.display='none';
+}
+
+// ── HELPERS ───────────────────────────────────────────────
+function badgeStatus(s){if(s==='In Progress')return 'badge-progress';if(s==='Resolved')return 'badge-closed';return 'badge-open';}
+function badgePriority(p){if(p==='Urgent')return 'badge-urgent';if(p==='High')return 'badge-high';if(p==='Low')return 'badge-low';return 'badge-medium';}
+function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>{t.className='toast';},3000);}
+</script>
+</body>
+</html>
