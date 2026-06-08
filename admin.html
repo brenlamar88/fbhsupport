@@ -120,6 +120,13 @@ const CONFIG = {
   AIRTABLE_BASE_ID: 'appOQI2Im5XebeIyg',
   AIRTABLE_TABLE: 'tblEMz0BecYmu48y0',
   ANTHROPIC_KEY: 'YOUR_ANTHROPIC_API_KEY',
+  // ── TEAM ── Edit this list with your real team members. Tickets can be
+  // assigned to anyone here, and "Notify assignee" emails the matching address.
+  TEAM: [
+    { name:'Bren Roberts', email:'bren@freedomhc.com' },
+    { name:'IT Support',   email:'support@freedomhc.com' },
+    { name:'Help Desk',    email:'helpdesk@freedomhc.com' },
+  ],
   TOOLS: [
     { name:'BlackOps', desc:'Operations CRM', icon:'🖥', bg:'#E6F1FB', dropdown:true, locations:['Monroe','Magnolia','Bastrop','Bunkie','Minden','Dequincy','Plainview','Greenville','Villeplatte','Ferriday','Leesville','LakeCharles'] },
     { name:'Broken Process', url:'https://freedombehavioral.vercel.app', desc:'Report broken workflows', icon:'⚠️', bg:'#FAEEDA' },
@@ -210,7 +217,14 @@ const CONFIG = {
         <option value="Resolved">Resolved</option>
       </select>
     </div>
+    <div class="form-row">
+      <label class="form-label">Assign to</label>
+      <select id="modal-assignee" onchange="assignTicket()">
+        <option value="">Unassigned</option>
+      </select>
+    </div>
     <div class="modal-actions">
+      <button class="btn btn-sm" onclick="notifyAssignee()">✉ Notify assignee</button>
       <button class="btn btn-sm btn-danger" onclick="deleteTicket()">Delete ticket</button>
       <button class="btn btn-sm btn-primary" onclick="closeModal()">Done</button>
     </div>
@@ -230,6 +244,7 @@ function checkPassword() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('dashboard').classList.add('show');
     renderTools();
+    populateTeam();
     loadTickets();
     setLastUpdated();
   } else {
@@ -253,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('dashboard').classList.add('show');
     renderTools();
+    populateTeam();
     loadTickets();
     setLastUpdated();
   }
@@ -266,6 +282,18 @@ function setLastUpdated() {
   document.getElementById('last-updated').textContent =
     now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) + ' · ' +
     now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+// ── TEAM ──────────────────────────────────────────────────
+function populateTeam() {
+  const sel = document.getElementById('modal-assignee');
+  sel.innerHTML = '<option value="">Unassigned</option>' +
+    CONFIG.TEAM.map(m => `<option value="${m.email}">${m.name} (${m.email})</option>`).join('');
+}
+function assigneeName(email) {
+  if (!email) return '';
+  const m = CONFIG.TEAM.find(t => t.email === email);
+  return m ? m.name : email;
 }
 
 // ── TOOLS ─────────────────────────────────────────────────
@@ -358,7 +386,7 @@ function renderTicketList() {
         <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
       </div>
       <div class="ticket-snippet">${f.Subject||''} — ${(f['Issue']||'').slice(0,80)}${(f['Issue']||'').length>80?'…':''}</div>
-      <div class="ticket-meta">${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'}</span>${f.Email?` · ${f.Email}`:''}</div>
+      <div class="ticket-meta">${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'}</span>${f.Email?` · ${f.Email}`:''}${f['Assigned To']?` · 👤 ${assigneeName(f['Assigned To'])}`:''}</div>
     </div>`;
   }).join('');
 }
@@ -378,10 +406,16 @@ function openModal(id) {
   document.getElementById('modal-meta').innerHTML=`
     <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
     <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'} priority</span>
-    <span>${f.Facility||''}</span>${f.Email?`<span>📧 ${f.Email}</span>`:''}
+    <span>${f.Facility||''}</span>${f.Email?`<span>📧 ${f.Email}</span>`:''}${f['Assigned To']?`<span>👤 ${assigneeName(f['Assigned To'])}</span>`:''}
     <span>${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''}</span>`;
   document.getElementById('modal-body').innerHTML='<strong>'+(f.Tool||'')+'</strong><br><br>'+(f.Issue||'');
   document.getElementById('modal-status').value=f.Status||'Open';
+  // If assigned to someone not in the team list, add a temporary option so it shows.
+  const aSel=document.getElementById('modal-assignee'), assigned=f['Assigned To']||'';
+  if(assigned && !CONFIG.TEAM.some(t=>t.email===assigned)){
+    aSel.insertAdjacentHTML('beforeend',`<option value="${assigned}">${assigned}</option>`);
+  }
+  aSel.value=assigned;
   document.getElementById('modal-overlay').classList.add('show');
 }
 function closeModal(e) {
@@ -395,6 +429,39 @@ async function updateTicketStatus() {
     await atPatch(activeTicket.id,{Status:ns}); activeTicket.fields.Status=ns;
     showToast('Status updated.','success'); await loadTickets();
   } catch(e){showToast('Failed to update.','error');}
+}
+async function assignTicket() {
+  if(!activeTicket)return;
+  const email=document.getElementById('modal-assignee').value;
+  try {
+    await atPatch(activeTicket.id,{'Assigned To':email});
+    activeTicket.fields['Assigned To']=email;
+    showToast(email?`Assigned to ${assigneeName(email)}.`:'Unassigned.','success');
+    renderTicketList();
+  } catch(e){showToast('Failed to assign.','error');}
+}
+function notifyAssignee() {
+  if(!activeTicket)return;
+  const email=document.getElementById('modal-assignee').value;
+  if(!email){showToast('Assign the ticket to someone first.','error');return;}
+  const f=activeTicket.fields;
+  const subject=`[FBH Support] ${f.Priority||'Medium'} — ${f.Subject||f.Tool||'Ticket'} (${f.Facility||''})`;
+  const body=[
+    `Hi ${assigneeName(email)||'there'},`,'',
+    'A support ticket has been assigned to you:','',
+    `Facility:     ${f.Facility||'—'}`,
+    `Tool/System:  ${f.Tool||'—'}`,
+    `Priority:     ${f.Priority||'Medium'}`,
+    `Status:       ${f.Status||'Open'}`,
+    `Submitted by: ${f.Email||'—'}`,
+    `Date:         ${f['Date Submitted']||'—'}`,'',
+    `Subject: ${f.Subject||'—'}`,'',
+    'Issue:',`${f.Issue||'—'}`,'',
+    '— Freedom Behavioral Health · Technology Hub'
+  ].join('\n');
+  // CC the original requester so they know their ticket is being handled.
+  const cc=f.Email?`&cc=${encodeURIComponent(f.Email)}`:'';
+  window.location.href=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${cc}`;
 }
 async function deleteTicket() {
   if(!activeTicket)return;
