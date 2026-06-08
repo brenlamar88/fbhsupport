@@ -343,7 +343,11 @@ async function atGet(params='') {
 }
 async function atPatch(id, fields) {
   const res = await fetch(`${AT_BASE}/${id}`, {method:'PATCH',headers:AT_HEADERS,body:JSON.stringify({fields})});
-  if (!res.ok) throw new Error(`Airtable error ${res.status}`);
+  if (!res.ok) {
+    let detail='';
+    try { const j=await res.json(); detail = j.error?.message || j.error?.type || ''; } catch(_){}
+    throw new Error(`Airtable ${res.status}${detail?': '+detail:''}`);
+  }
   return res.json();
 }
 async function atDelete(id) {
@@ -439,7 +443,7 @@ async function assignTicket() {
     activeTicket.fields['Assigned To']=email;
     showToast(email?`Assigned to ${assigneeName(email)}.`:'Unassigned.','success');
     renderTicketList();
-  } catch(e){showToast('Failed to assign.','error');}
+  } catch(e){showToast('Failed to assign — '+e.message,'error');}
 }
 function notifyAssignee() {
   if(!activeTicket)return;
