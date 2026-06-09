@@ -466,7 +466,13 @@ function notifyAssignee() {
   ].join('\n');
   // CC the original requester so they know their ticket is being handled.
   const cc=f.Email?`&cc=${encodeURIComponent(f.Email)}`:'';
-  window.location.href=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${cc}`;
+  const href=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${cc}`;
+  // Use a real anchor click — more reliable than location.href for launching
+  // the default mail client (e.g. desktop Outlook) across browsers.
+  const a=document.createElement('a');
+  a.href=href; a.style.display='none';
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast('Opening email to '+(assigneeName(email)||email)+'…');
 }
 async function deleteTicket() {
   if(!activeTicket)return;
