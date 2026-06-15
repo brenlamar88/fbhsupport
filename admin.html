@@ -190,6 +190,11 @@ const CONFIG = {
             <option>Greenville</option><option>Ville Platte</option><option>Ferriday</option>
             <option>Leesville</option><option>Lake Charles</option>
           </select>
+          <select id="filter-tool" style="width:auto;font-size:12px;padding:4px 8px" onchange="loadTickets()">
+            <option value="">All tools</option>
+            <option>BlackOps</option><option>Broken Process</option><option>RAP</option><option>PIP</option>
+            <option>POP</option><option>NetSfere</option><option>Email</option><option>Other / General IT</option>
+          </select>
           <button class="btn btn-sm" onclick="loadTickets()" title="Refresh">↻</button>
         </div>
       </div>
@@ -363,9 +368,11 @@ async function loadTickets() {
   try {
     const sf = document.getElementById('filter-status').value;
     const ff = document.getElementById('filter-facility').value;
+    const tf = document.getElementById('filter-tool').value;
     let filters = [];
     if (sf) filters.push(`{Status}="${sf}"`);
     if (ff) filters.push(`{Facility}="${ff}"`);
+    if (tf) filters.push(`{Tool}="${tf}"`);
     let bp = 'sort[0][field]=Date Submitted&sort[0][direction]=desc';
     if (filters.length) bp += `&filterByFormula=${encodeURIComponent(filters.length>1?`AND(${filters.join(',')})`:filters[0])}`;
     let records=[], offset=null;
