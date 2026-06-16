@@ -113,6 +113,7 @@
 </style>
 </head>
 <body>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
 const CONFIG = {
   ADMIN_PASSWORD: 'FBH2020!',
@@ -120,6 +121,15 @@ const CONFIG = {
   AIRTABLE_BASE_ID: 'appOQI2Im5XebeIyg',
   AIRTABLE_TABLE: 'tblEMz0BecYmu48y0',
   ANTHROPIC_KEY: 'YOUR_ANTHROPIC_API_KEY',
+  // ── EMAIL (EmailJS) ── Sends an automatic notification when a ticket is
+  // assigned. Set ENABLED:false to turn auto-emails off and fall back to the
+  // Outlook compose tab. Template variable names are documented in sendAssignmentEmail().
+  EMAILJS: {
+    ENABLED: true,
+    SERVICE_ID: 'service_ucspnwu',
+    TEMPLATE_ID: 'template_i1zrsar',
+    PUBLIC_KEY: 'BbYLdPAgSRvGaUdGq',
+  },
   // ── TEAM ── Edit this list with your real team members. Tickets can be
   // assigned to anyone here, and "Notify assignee" emails the matching address.
   TEAM: [
@@ -448,15 +458,25 @@ async function assignTicket() {
   try {
     await atPatch(activeTicket.id,{'Assigned To':email});
     activeTicket.fields['Assigned To']=email;
-    showToast(email?`Assigned to ${assigneeName(email)}.`:'Unassigned.','success');
     renderTicketList();
+    if(!email){showToast('Unassigned.','success');return;}
+    // Auto-send the notification email when EmailJS is configured.
+    if(CONFIG.EMAILJS.ENABLED && window.emailjs){
+      showToast(`Assigned to ${assigneeName(email)} — emailing…`);
+      try {
+        await sendAssignmentEmail(email, activeTicket.fields);
+        showToast(`Assigned & emailed ${assigneeName(email)}.`,'success');
+      } catch(err){
+        showToast('Assigned, but email failed: '+(err?.text||err?.message||'unknown'),'error');
+      }
+    } else {
+      showToast(`Assigned to ${assigneeName(email)}.`,'success');
+    }
   } catch(e){showToast('Failed to assign — '+e.message,'error');}
 }
-function notifyAssignee() {
-  if(!activeTicket)return;
-  const email=document.getElementById('modal-assignee').value;
-  if(!email){showToast('Assign the ticket to someone first.','error');return;}
-  const f=activeTicket.fields;
+
+// Builds the subject + body shared by EmailJS and the Outlook fallback.
+function buildTicketEmail(email, f) {
   const subject=`[FBH Support] ${f.Priority||'Medium'} — ${f.Subject||f.Tool||'Ticket'} (${f.Facility||''})`;
   const body=[
     `Hi ${assigneeName(email)||'there'},`,'',
@@ -471,11 +491,53 @@ function notifyAssignee() {
     'Issue:',`${f.Issue||'—'}`,'',
     '— Freedom Behavioral Health · Technology Hub'
   ].join('\n');
-  // CC the original requester so they know their ticket is being handled.
+  return {subject, body};
+}
+
+// Sends the assignment notification through EmailJS. The EmailJS template
+// should map these variables: {{to_email}} (recipient), {{to_name}},
+// {{subject}}, {{message}}, and optionally {{cc_email}}/{{reply_to}} plus the
+// individual fields below. Set the template's "To Email" field to {{to_email}}.
+function sendAssignmentEmail(email, f) {
+  const {subject, body}=buildTicketEmail(email, f);
+  const params={
+    to_email: email,
+    to_name: assigneeName(email)||email,
+    subject: subject,
+    message: body,
+    cc_email: f.Email||'',
+    reply_to: f.Email||'',
+    facility: f.Facility||'',
+    tool: f.Tool||'',
+    priority: f.Priority||'Medium',
+    status: f.Status||'Open',
+    requester_email: f.Email||'',
+    date_submitted: f['Date Submitted']||'',
+    ticket_subject: f.Subject||'',
+    issue: f.Issue||'',
+  };
+  return emailjs.send(CONFIG.EMAILJS.SERVICE_ID, CONFIG.EMAILJS.TEMPLATE_ID, params, {publicKey:CONFIG.EMAILJS.PUBLIC_KEY});
+}
+
+async function notifyAssignee() {
+  if(!activeTicket)return;
+  const email=document.getElementById('modal-assignee').value;
+  if(!email){showToast('Assign the ticket to someone first.','error');return;}
+  const f=activeTicket.fields;
+  // Preferred path: send automatically via EmailJS.
+  if(CONFIG.EMAILJS.ENABLED && window.emailjs){
+    showToast('Emailing '+(assigneeName(email)||email)+'…');
+    try {
+      await sendAssignmentEmail(email, f);
+      showToast('Emailed '+(assigneeName(email)||email)+'.','success');
+    } catch(err){
+      showToast('Email failed: '+(err?.text||err?.message||'unknown'),'error');
+    }
+    return;
+  }
+  // Fallback: open a pre-filled Outlook-on-the-web compose tab.
+  const {subject, body}=buildTicketEmail(email, f);
   const cc=f.Email||'';
-  // Open a pre-filled Outlook-on-the-web compose tab. This avoids relying on a
-  // default desktop mail handler (mailto:), which often does nothing for M365
-  // web users. Works as long as the admin is signed into Outlook in the browser.
   const url='https://outlook.office.com/mail/deeplink/compose?'+
     'to='+encodeURIComponent(email)+
     (cc?'&cc='+encodeURIComponent(cc):'')+
