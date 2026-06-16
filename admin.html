@@ -472,14 +472,17 @@ function notifyAssignee() {
     '— Freedom Behavioral Health · Technology Hub'
   ].join('\n');
   // CC the original requester so they know their ticket is being handled.
-  const cc=f.Email?`&cc=${encodeURIComponent(f.Email)}`:'';
-  const href=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${cc}`;
-  // Use a real anchor click — more reliable than location.href for launching
-  // the default mail client (e.g. desktop Outlook) across browsers.
-  const a=document.createElement('a');
-  a.href=href; a.style.display='none';
-  document.body.appendChild(a); a.click(); a.remove();
-  showToast('Opening email to '+(assigneeName(email)||email)+'…');
+  const cc=f.Email||'';
+  // Open a pre-filled Outlook-on-the-web compose tab. This avoids relying on a
+  // default desktop mail handler (mailto:), which often does nothing for M365
+  // web users. Works as long as the admin is signed into Outlook in the browser.
+  const url='https://outlook.office.com/mail/deeplink/compose?'+
+    'to='+encodeURIComponent(email)+
+    (cc?'&cc='+encodeURIComponent(cc):'')+
+    '&subject='+encodeURIComponent(subject)+
+    '&body='+encodeURIComponent(body);
+  window.open(url,'_blank','noopener');
+  showToast('Opening Outlook to email '+(assigneeName(email)||email)+'…');
 }
 async function deleteTicket() {
   if(!activeTicket)return;
