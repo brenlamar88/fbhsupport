@@ -408,7 +408,7 @@ function renderTicketList() {
         <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
       </div>
       <div class="ticket-snippet">${f.Subject||''} — ${(f['Issue']||'').slice(0,80)}${(f['Issue']||'').length>80?'…':''}</div>
-      <div class="ticket-meta">${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'}</span>${f.Email?` · ${f.Email}`:''}${f['Assigned To']?` · 👤 ${assigneeName(f['Assigned To'])}`:''}</div>
+      <div class="ticket-meta">${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'}</span>${f.Name?` · ${f.Name}`:''}${f.Email?` · ${f.Email}`:''}${f['Assigned To']?` · 👤 ${assigneeName(f['Assigned To'])}`:''}</div>
     </div>`;
   }).join('');
 }
@@ -428,7 +428,7 @@ function openModal(id) {
   document.getElementById('modal-meta').innerHTML=`
     <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
     <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'} priority</span>
-    <span>${f.Facility||''}</span>${f.Email?`<span>📧 ${f.Email}</span>`:''}${f['Assigned To']?`<span>👤 ${assigneeName(f['Assigned To'])}</span>`:''}
+    <span>${f.Facility||''}</span>${f.Name?`<span>🧑 ${f.Name}</span>`:''}${f.Email?`<span>📧 ${f.Email}</span>`:''}${f['Assigned To']?`<span>👤 ${assigneeName(f['Assigned To'])}</span>`:''}
     <span>${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''}</span>`;
   document.getElementById('modal-body').innerHTML='<strong>'+(f.Tool||'')+'</strong><br><br>'+(f.Issue||'');
   document.getElementById('modal-status').value=f.Status||'Open';
@@ -565,7 +565,7 @@ async function runAISummary() {
   const open=allTickets.filter(r=>r.fields.Status==='Open').length;
   const prog=allTickets.filter(r=>r.fields.Status==='In Progress').length;
   const closed=allTickets.filter(r=>r.fields.Status==='Resolved').length;
-  const urgent=allTickets.filter(r=>r.fields.Priority==='Urgent'&&r.fields.Status!=='Resolved').length;
+  const urgent=allTickets.filter(r=>(r.fields.Priority==='Urgent'||r.fields.Priority==='Critical')&&r.fields.Status!=='Resolved').length;
   try {
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -584,7 +584,7 @@ async function runAISummary() {
 
 // ── HELPERS ───────────────────────────────────────────────
 function badgeStatus(s){if(s==='In Progress')return 'badge-progress';if(s==='Resolved')return 'badge-closed';return 'badge-open';}
-function badgePriority(p){if(p==='Urgent')return 'badge-urgent';if(p==='High')return 'badge-high';if(p==='Low')return 'badge-low';return 'badge-medium';}
+function badgePriority(p){if(p==='Urgent'||p==='Critical')return 'badge-urgent';if(p==='High')return 'badge-high';if(p==='Low')return 'badge-low';return 'badge-medium';}
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>{t.className='toast';},3000);}
 </script>
 </body>
