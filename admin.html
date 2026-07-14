@@ -110,6 +110,29 @@
   .toast.show{opacity:1}
   .toast.error{background:#A32D2D}
   .toast.success{background:#3B6D11}
+  /* ── REPORTS ── */
+  .rep-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:6px 0 1rem}
+  .rep-tile{background:#f5f5f3;border-radius:8px;padding:12px;text-align:center}
+  .rep-tile .n{font-size:22px;font-weight:600;line-height:1}
+  .rep-tile .l{font-size:11px;color:#888;margin-top:4px}
+  .rep-delta-up{color:#A32D2D}
+  .rep-delta-down{color:#3B6D11}
+  .rep-section-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.07em;margin:1.1rem 0 8px}
+  .rep-legend{display:flex;gap:14px;font-size:11px;color:#666;margin-bottom:10px}
+  .rep-legend span{display:inline-flex;align-items:center;gap:5px}
+  .rep-swatch{width:10px;height:10px;border-radius:2px;display:inline-block}
+  .rep-weeks{display:flex;gap:12px;align-items:flex-end;overflow-x:auto;padding:14px 2px 6px}
+  .rep-week{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:50px}
+  .rep-week-bars{display:flex;gap:3px;align-items:flex-end;height:120px}
+  .rep-bar{width:14px;border-radius:3px 3px 0 0;position:relative;min-height:2px}
+  .rep-bar-val{font-size:9px;color:#666;position:absolute;top:-13px;left:50%;transform:translateX(-50%)}
+  .rep-week-lbl{font-size:10px;color:#888;white-space:nowrap}
+  .rep-hbars{display:flex;flex-direction:column;gap:6px}
+  .rep-hbar{display:grid;grid-template-columns:120px 1fr 32px;align-items:center;gap:8px;font-size:12px}
+  .rep-hbar-track{background:#f0f0ee;border-radius:5px;height:16px;overflow:hidden}
+  .rep-hbar-fill{height:100%;border-radius:5px;min-width:2px}
+  .rep-hbar-num{text-align:right;color:#555;font-variant-numeric:tabular-nums}
+  .rep-note{font-size:11px;color:#aaa;margin-top:10px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -224,6 +247,21 @@ const CONFIG = {
         <div class="ai-output" id="ai-output"></div>
       </div>
     </div>
+
+    <div class="card" style="margin-top:1.25rem">
+      <div class="list-controls">
+        <div class="section-label" style="margin:0">Reports &amp; Analytics</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:12px;color:#888">From <input type="date" id="rep-from" style="width:auto;font-size:12px;padding:4px 8px"></label>
+          <label style="font-size:12px;color:#888">To <input type="date" id="rep-to" style="width:auto;font-size:12px;padding:4px 8px"></label>
+          <button class="btn btn-sm" onclick="setRepPreset(7)" title="Last 7 days">7d</button>
+          <button class="btn btn-sm" onclick="setRepPreset(28)" title="Last 4 weeks">4wk</button>
+          <button class="btn btn-sm" onclick="setRepPreset(90)" title="Last 90 days">90d</button>
+          <button class="btn btn-sm btn-primary" onclick="loadReport()">Apply</button>
+        </div>
+      </div>
+      <div id="rep-body"><div class="loading-row">Building report…</div></div>
+    </div>
   </div>
 </div>
 
@@ -272,6 +310,7 @@ function checkPassword() {
     loadTickets();
     setLastUpdated();
     startAutoRefresh();
+    initReport();
   } else {
     document.getElementById('login-error').classList.add('show');
     document.getElementById('pw-input').value = '';
@@ -298,6 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTickets();
     setLastUpdated();
     startAutoRefresh();
+    initReport();
   }
   document.getElementById('pw-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') checkPassword();
@@ -637,6 +677,107 @@ async function runAISummary() {
     out.style.display='block';
   } catch(e){out.textContent='Error connecting to AI.';out.style.display='block';}
   btn.disabled=false; spinner.style.display='none';
+}
+
+// ── REPORTS ───────────────────────────────────────────────
+function repParseDate(s){ if(!s)return null; const p=String(s).slice(0,10).split('-'); if(p.length<3)return null; const d=new Date(+p[0],+p[1]-1,+p[2]); return isNaN(d)?null:d; }
+function repWeekStart(d){ const x=new Date(d); const off=(x.getDay()+6)%7; x.setDate(x.getDate()-off); x.setHours(0,0,0,0); return x; }
+function repFmt(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+
+async function atGetAll(){
+  let records=[], offset=null;
+  const bp='sort[0][field]=Date Submitted&sort[0][direction]=desc';
+  do { let p=bp; if(offset)p+=`&offset=${offset}`; const data=await atGet(p); records=records.concat(data.records||[]); offset=data.offset||null; } while(offset);
+  return records;
+}
+
+function setRepPreset(days){
+  const to=new Date(), from=new Date(); from.setDate(from.getDate()-(days-1));
+  const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('rep-to').value=iso(to);
+  document.getElementById('rep-from').value=iso(from);
+  loadReport();
+}
+function initReport(){ setRepPreset(28); }
+
+function computeReport(records, from, to){
+  const inR=d=>d && d>=from && d<=to;
+  const subs=records.map(r=>({r,d:repParseDate(r.fields['Date Submitted'])})).filter(x=>inR(x.d));
+  const ress=records.map(r=>({r,d:repParseDate(r.fields['Resolved Date'])})).filter(x=>inR(x.d));
+
+  // Weekly buckets across the range.
+  const weeks=[]; let ws=repWeekStart(from); const last=repWeekStart(to);
+  while(ws<=last){ weeks.push(new Date(ws)); ws=new Date(ws); ws.setDate(ws.getDate()+7); }
+  const wk={}; weeks.forEach(w=>wk[+w]={w,sub:0,res:0});
+  subs.forEach(x=>{ const k=+repWeekStart(x.d); if(wk[k])wk[k].sub++; });
+  ress.forEach(x=>{ const k=+repWeekStart(x.d); if(wk[k])wk[k].res++; });
+  const weeksArr=weeks.map(w=>wk[+w]);
+
+  // Breakdowns by facility / tool (by submission in range).
+  const byFac={}, byTool={};
+  subs.forEach(x=>{ const f=x.r.fields; const fa=f.Facility||'—', tl=f.Tool||'—'; byFac[fa]=(byFac[fa]||0)+1; byTool[tl]=(byTool[tl]||0)+1; });
+
+  // Previous equal-length period for the trend comparison.
+  const lenDays=Math.round((to-from)/86400000)+1;
+  const prevTo=new Date(from); prevTo.setDate(prevTo.getDate()-1);
+  const prevFrom=new Date(prevTo); prevFrom.setDate(prevFrom.getDate()-(lenDays-1));
+  const prevSub=records.map(r=>repParseDate(r.fields['Date Submitted'])).filter(d=>d&&d>=prevFrom&&d<=prevTo).length;
+  const curSub=subs.length, delta=curSub-prevSub;
+  const pct=prevSub?Math.round(delta/prevSub*100):(curSub?100:0);
+
+  return { curSub, curRes:ress.length, prevSub, delta, pct, lenDays, weeksArr, byFac, byTool };
+}
+
+function repHBars(obj, color){
+  const entries=Object.entries(obj).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length) return '<div class="rep-note">No tickets in range.</div>';
+  const max=Math.max(...entries.map(e=>e[1]),1);
+  return '<div class="rep-hbars">'+entries.map(([k,v])=>
+    `<div class="rep-hbar"><div>${k}</div><div class="rep-hbar-track"><div class="rep-hbar-fill" style="width:${v/max*100}%;background:${color}"></div></div><div class="rep-hbar-num">${v}</div></div>`
+  ).join('')+'</div>';
+}
+
+function renderReport(data){
+  const arrow=data.delta>0?'▲':data.delta<0?'▼':'—';
+  const cls=data.delta>0?'rep-delta-up':data.delta<0?'rep-delta-down':'';
+  const maxW=Math.max(1, ...data.weeksArr.flatMap(x=>[x.sub,x.res]));
+  const weeksHtml=data.weeksArr.length
+    ? data.weeksArr.map(x=>
+        `<div class="rep-week"><div class="rep-week-bars">
+           <div class="rep-bar" style="height:${Math.max(2,x.sub/maxW*120)}px;background:#185FA5"><span class="rep-bar-val">${x.sub}</span></div>
+           <div class="rep-bar" style="height:${Math.max(2,x.res/maxW*120)}px;background:#3B6D11"><span class="rep-bar-val">${x.res}</span></div>
+         </div><div class="rep-week-lbl">${repFmt(x.w)}</div></div>`
+      ).join('')
+    : '<div class="rep-note">No weeks in range.</div>';
+
+  document.getElementById('rep-body').innerHTML=`
+    <div class="rep-tiles">
+      <div class="rep-tile"><div class="n" style="color:#185FA5">${data.curSub}</div><div class="l">Submitted</div></div>
+      <div class="rep-tile"><div class="n" style="color:#3B6D11">${data.curRes}</div><div class="l">Resolved</div></div>
+      <div class="rep-tile"><div class="n">${data.curSub-data.curRes}</div><div class="l">Net (unresolved)</div></div>
+      <div class="rep-tile"><div class="n ${cls}">${arrow} ${Math.abs(data.pct)}%</div><div class="l">vs prior ${data.lenDays}d (${data.prevSub})</div></div>
+    </div>
+    <div class="rep-section-label">Submitted vs Resolved by week</div>
+    <div class="rep-legend">
+      <span><span class="rep-swatch" style="background:#185FA5"></span>Submitted</span>
+      <span><span class="rep-swatch" style="background:#3B6D11"></span>Resolved</span>
+    </div>
+    <div class="rep-weeks">${weeksHtml}</div>
+    <div class="rep-section-label">Tickets per facility</div>${repHBars(data.byFac,'#185FA5')}
+    <div class="rep-section-label">Tickets per tool</div>${repHBars(data.byTool,'#534AB7')}
+    <div class="rep-note">“Submitted” is counted by Date Submitted; “Resolved” by Resolved Date (only tickets that have that field set — older resolved tickets without it won’t appear as resolved). Facility and tool counts are by submission date within the selected range.</div>`;
+}
+
+async function loadReport(){
+  const body=document.getElementById('rep-body');
+  const from=repParseDate(document.getElementById('rep-from').value);
+  const to=repParseDate(document.getElementById('rep-to').value);
+  if(!from||!to||from>to){ body.innerHTML='<div class="rep-note">Pick a valid From/To range.</div>'; return; }
+  body.innerHTML='<div class="loading-row">Building report…</div>';
+  try {
+    const records=await atGetAll();
+    renderReport(computeReport(records, from, to));
+  } catch(e){ body.innerHTML=`<div class="empty-state">Report error: ${e.message}</div>`; }
 }
 
 // ── HELPERS ───────────────────────────────────────────────
