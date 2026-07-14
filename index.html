@@ -74,8 +74,32 @@ const CONFIG = {
   EMAILJS: {
     SERVICE_ID: 'service_ucspnwu',
     PUBLIC_KEY: 'BbYLdPAgSRvGaUdGq',
-    CONFIRM_TEMPLATE_ID: '',
+    CONFIRM_TEMPLATE_ID: '',                 // requester confirmation (create + paste ID)
+    ASSIGN_TEMPLATE_ID: 'template_i1zrsar',  // assignee notification (existing template)
   },
+  // ── AUTO-ROUTING ── When a ticket is submitted it is auto-assigned to an
+  // owner and that owner is emailed immediately. Precedence: BY_TOOL → BY_FACILITY
+  // → DEFAULT. Fill in the maps below with real owners; anything unlisted goes to
+  // DEFAULT. Set ENABLED:false to turn auto-routing off.
+  ROUTING: {
+    ENABLED: true,
+    DEFAULT: 'broberts@freedomhc.com',
+    BY_TOOL: {
+      // 'BlackOps': 'bryder@freedomhc.com',
+      // 'SharePoint': 'support@freedomhc.com',
+      // 'Email': 'support@freedomhc.com',
+    },
+    BY_FACILITY: {
+      // 'Monroe': 'someone@freedomhc.com',
+    },
+  },
+  // Name lookup for email greetings (mirror of admin TEAM).
+  TEAM: [
+    { name:'Bren Roberts',  email:'broberts@freedomhc.com' },
+    { name:'Braden Ryder',  email:'bryder@freedomhc.com' },
+    { name:'IT Support',    email:'support@freedomhc.com' },
+    { name:'Help Desk',     email:'helpdesk@freedomhc.com' },
+  ],
   TOOLS: [
     { name:'BlackOps', desc:'Operations CRM', icon:'🖥', bg:'#E6F1FB', dropdown:true, locations:['Monroe','Magnolia','Bastrop','Bunkie','Minden','Dequincy','Plainview','Greenville','Villeplatte','Ferriday','Leesville','LakeCharles'] },
     { name:'Broken Process', url:'https://freedombehavioral.vercel.app', desc:'Report broken workflows', icon:'⚠️', bg:'#FAEEDA' },
@@ -228,11 +252,18 @@ async function submitTicket() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Submitting...';
 
+  // Auto-routing: decide the owner for this ticket (Tool → Facility → default).
+  const r = CONFIG.ROUTING;
+  const assignee = (r && r.ENABLED)
+    ? (r.BY_TOOL[tool] || r.BY_FACILITY[facility] || r.DEFAULT || '')
+    : '';
+
   const baseFields = {
     "Subject": subject, "Email": email, "Issue": issue,
     "Priority": priority, "Status": "Open", "Facility": facility,
     "Tool": tool, "Date Submitted": new Date().toISOString().split('T')[0]
   };
+  if (assignee) baseFields["Assigned To"] = assignee;
 
   async function createRecord(fields) {
     const res = await fetch(AT_BASE, { method:'POST', headers:AT_HEADERS, body:JSON.stringify({fields}) });
@@ -265,6 +296,30 @@ async function submitTicket() {
       }, { publicKey: CONFIG.EMAILJS.PUBLIC_KEY }).catch(()=>{});
     }
 
+    // Notify the auto-assigned owner immediately (if EmailJS is configured).
+    if (assignee && CONFIG.EMAILJS.ASSIGN_TEMPLATE_ID && window.emailjs) {
+      const ownerName = teamName(assignee);
+      const message = [
+        `Hi ${ownerName||'there'},`,'',
+        `A new support ticket (Ref ${ref}) has been auto-assigned to you:`,'',
+        `From:     ${name} <${email}>`,
+        `Facility: ${facility}`,
+        `Tool:     ${tool}`,
+        `Priority: ${priority}`,'',
+        `Subject: ${subject}`,'',
+        'Issue:', issue,'',
+        '— Freedom Behavioral Health · Technology Hub'
+      ].join('\n');
+      emailjs.send(CONFIG.EMAILJS.SERVICE_ID, CONFIG.EMAILJS.ASSIGN_TEMPLATE_ID, {
+        to_email: assignee, to_name: ownerName||assignee,
+        subject: `[FBH Support] ${priority} — ${subject} (${facility})`,
+        message, cc_email: email, reply_to: email,
+        facility, tool, priority, status:'Open',
+        requester_email: email, date_submitted: baseFields['Date Submitted'],
+        ticket_subject: subject, issue,
+      }, { publicKey: CONFIG.EMAILJS.PUBLIC_KEY }).catch(()=>{});
+    }
+
     // Show success
     document.getElementById('form-card').style.display = 'none';
     document.getElementById('success-detail').innerHTML =
@@ -291,6 +346,11 @@ function resetForm() {
   document.getElementById('submit-btn').textContent = 'Submit Ticket';
   document.getElementById('form-card').style.display = 'block';
   document.getElementById('success-card').classList.remove('show');
+}
+
+function teamName(emailAddr) {
+  const m = (CONFIG.TEAM||[]).find(t => t.email === emailAddr);
+  return m ? m.name : '';
 }
 
 function showToast(msg, type='') {
