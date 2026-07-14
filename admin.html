@@ -408,7 +408,7 @@ function renderTicketList() {
         <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
       </div>
       <div class="ticket-snippet">${f.Subject||''} — ${(f['Issue']||'').slice(0,80)}${(f['Issue']||'').length>80?'…':''}</div>
-      <div class="ticket-meta">${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'}</span>${f.Name?` · ${f.Name}`:''}${f.Email?` · ${f.Email}`:''}${f['Assigned To']?` · 👤 ${assigneeName(f['Assigned To'])}`:''}</div>
+      <div class="ticket-meta">${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'}</span>${agingBadge(f)}${f.Name?` · ${f.Name}`:''}${f.Email?` · ${f.Email}`:''}${f['Assigned To']?` · 👤 ${assigneeName(f['Assigned To'])}`:''}</div>
     </div>`;
   }).join('');
 }
@@ -427,7 +427,7 @@ function openModal(id) {
   document.getElementById('modal-title').textContent=(f.Subject||f.Tool||'Support Ticket')+' — '+(f.Facility||'');
   document.getElementById('modal-meta').innerHTML=`
     <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
-    <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'} priority</span>
+    <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'} priority</span>${agingBadge(f)}
     <span>${f.Facility||''}</span>${f.Name?`<span>🧑 ${f.Name}</span>`:''}${f.Email?`<span>📧 ${f.Email}</span>`:''}${f['Assigned To']?`<span>👤 ${assigneeName(f['Assigned To'])}</span>`:''}
     <span>${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''}</span>`;
   document.getElementById('modal-body').innerHTML='<strong>'+(f.Tool||'')+'</strong><br><br>'+(f.Issue||'');
@@ -447,8 +447,18 @@ function closeModal(e) {
 async function updateTicketStatus() {
   if(!activeTicket)return;
   const ns=document.getElementById('modal-status').value;
+  const today=new Date().toISOString().split('T')[0];
+  const fields={Status:ns};
+  if(ns==='Resolved') fields['Resolved Date']=today;   // stamp resolution time
   try {
-    await atPatch(activeTicket.id,{Status:ns}); activeTicket.fields.Status=ns;
+    try { await atPatch(activeTicket.id,fields); }
+    catch(err){
+      // Base may not have a "Resolved Date" field yet — retry with just status.
+      if(/Unknown field|UNKNOWN_FIELD_NAME/i.test(err.message)) await atPatch(activeTicket.id,{Status:ns});
+      else throw err;
+    }
+    activeTicket.fields.Status=ns;
+    if(ns==='Resolved') activeTicket.fields['Resolved Date']=today;
     showToast('Status updated.','success'); await loadTickets();
   } catch(e){showToast('Failed to update.','error');}
 }
@@ -585,6 +595,27 @@ async function runAISummary() {
 // ── HELPERS ───────────────────────────────────────────────
 function badgeStatus(s){if(s==='In Progress')return 'badge-progress';if(s==='Resolved')return 'badge-closed';return 'badge-open';}
 function badgePriority(p){if(p==='Urgent'||p==='Critical')return 'badge-urgent';if(p==='High')return 'badge-high';if(p==='Low')return 'badge-low';return 'badge-medium';}
+// ── SLA / AGING ── Target days-to-resolve by priority. A ticket open longer
+// than its target is flagged overdue.
+const SLA_DAYS = { Urgent:1, Critical:1, High:2, Medium:4, Low:7 };
+function agingInfo(f){
+  const sub=f['Date Submitted']; if(!sub)return null;
+  const start=new Date(sub).getTime(); if(isNaN(start))return null;
+  if(f.Status==='Resolved'){
+    const rd=f['Resolved Date']; if(!rd)return null;
+    const end=new Date(rd).getTime(); if(isNaN(end))return null;
+    return {resolved:true, days:Math.max(0,Math.round((end-start)/86400000))};
+  }
+  const days=Math.max(0,Math.floor((Date.now()-start)/86400000));
+  const thr=SLA_DAYS[f.Priority]!=null?SLA_DAYS[f.Priority]:SLA_DAYS.Medium;
+  return {resolved:false, days, overdue:days>thr};
+}
+function agingBadge(f){
+  const a=agingInfo(f); if(!a)return '';
+  if(a.resolved) return ` <span class="badge badge-closed">✓ ${a.days}d to resolve</span>`;
+  const label=a.days===0?'today':`${a.days}d open`;
+  return ` <span class="badge ${a.overdue?'badge-urgent':'badge-low'}">${a.overdue?'⏰ ':''}${label}</span>`;
+}
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>{t.className='toast';},3000);}
 </script>
 </body>
