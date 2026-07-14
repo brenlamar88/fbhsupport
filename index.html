@@ -60,11 +60,22 @@
 </style>
 </head>
 <body>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
 const CONFIG = {
   AIRTABLE_TOKEN: 'patz8kSMjhVRGMzp6.3aa05554e02233d38e547fba584b4d047385aee6af6ff06758256b813a840488',
   AIRTABLE_BASE_ID: 'appOQI2Im5XebeIyg',
   AIRTABLE_TABLE: 'tblEMz0BecYmu48y0',
+  // ── EMAIL (EmailJS) ── Sends a confirmation email to the person who submits
+  // a ticket. Create a second EmailJS template (e.g. "ticket confirmation") and
+  // paste its ID into CONFIRM_TEMPLATE_ID below. Leave it '' to disable.
+  // Template variables sent: {{to_email}} (set as the template's To Email),
+  // {{to_name}}, {{ref}}, {{subject}}, {{facility}}, {{tool}}, {{priority}}, {{issue}}.
+  EMAILJS: {
+    SERVICE_ID: 'service_ucspnwu',
+    PUBLIC_KEY: 'BbYLdPAgSRvGaUdGq',
+    CONFIRM_TEMPLATE_ID: '',
+  },
   TOOLS: [
     { name:'BlackOps', desc:'Operations CRM', icon:'🖥', bg:'#E6F1FB', dropdown:true, locations:['Monroe','Magnolia','Bastrop','Bunkie','Minden','Dequincy','Plainview','Greenville','Villeplatte','Ferriday','Leesville','LakeCharles'] },
     { name:'Broken Process', url:'https://freedombehavioral.vercel.app', desc:'Report broken workflows', icon:'⚠️', bg:'#FAEEDA' },
@@ -132,7 +143,7 @@ const CONFIG = {
           <option value="Low">Low — not blocking work</option>
           <option value="Medium" selected>Medium — slowing work down</option>
           <option value="High">High — blocking multiple people</option>
-          <option value="Critical">Critical — system down</option>
+          <option value="Urgent">Urgent — system down</option>
         </select>
       </div>
       <button class="btn btn-primary" id="submit-btn" onclick="submitTicket()">
@@ -217,21 +228,48 @@ async function submitTicket() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Submitting...';
 
+  const baseFields = {
+    "Subject": subject, "Email": email, "Issue": issue,
+    "Priority": priority, "Status": "Open", "Facility": facility,
+    "Tool": tool, "Date Submitted": new Date().toISOString().split('T')[0]
+  };
+
+  async function createRecord(fields) {
+    const res = await fetch(AT_BASE, { method:'POST', headers:AT_HEADERS, body:JSON.stringify({fields}) });
+    if (!res.ok) {
+      let type=''; try { type=(await res.json())?.error?.type||''; } catch(_){}
+      const err = new Error(`Airtable ${res.status}`); err.type=type; throw err;
+    }
+    return res.json();
+  }
+
   try {
-    await fetch(AT_BASE, {
-      method: 'POST',
-      headers: AT_HEADERS,
-      body: JSON.stringify({ fields: {
-        "Subject": subject, "Email": email, "Issue": issue,
-        "Priority": priority, "Status": "Open", "Facility": facility,
-        "Tool": tool, "Date Submitted": new Date().toISOString().split('T')[0]
-      }})
-    });
+    let record;
+    try {
+      // Include the submitter's name so admins see a person, not just an email.
+      record = await createRecord({ ...baseFields, "Name": name });
+    } catch(e) {
+      // If the base has no "Name" field yet, don't fail the submission — retry
+      // without it. (Add a "Name" single-line-text field in Airtable to store it.)
+      if (e.type === 'UNKNOWN_FIELD_NAME') record = await createRecord(baseFields);
+      else throw e;
+    }
+
+    // Human-friendly reference from the created record id.
+    const ref = record?.id ? record.id.slice(-6).toUpperCase() : '';
+
+    // Send a confirmation email to the requester (if EmailJS is configured).
+    if (CONFIG.EMAILJS.CONFIRM_TEMPLATE_ID && window.emailjs) {
+      emailjs.send(CONFIG.EMAILJS.SERVICE_ID, CONFIG.EMAILJS.CONFIRM_TEMPLATE_ID, {
+        to_email: email, to_name: name, ref, subject, facility, tool, priority, issue
+      }, { publicKey: CONFIG.EMAILJS.PUBLIC_KEY }).catch(()=>{});
+    }
 
     // Show success
     document.getElementById('form-card').style.display = 'none';
     document.getElementById('success-detail').innerHTML =
-      `<strong>Name:</strong> ${name}<br>
+      `${ref?`<strong>Reference #:</strong> ${ref}<br>`:''}
+       <strong>Name:</strong> ${name}<br>
        <strong>Facility:</strong> ${facility}<br>
        <strong>Tool:</strong> ${tool}<br>
        <strong>Subject:</strong> ${subject}<br>
