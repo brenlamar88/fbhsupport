@@ -205,8 +205,16 @@ const CONFIG = {
             <option>BlackOps</option><option>Broken Process</option><option>RAP</option><option>PIP</option>
             <option>POP</option><option>SharePoint</option><option>NetSfere</option><option>Email</option><option>Other / General IT</option>
           </select>
+          <select id="filter-assignee" style="width:auto;font-size:12px;padding:4px 8px" onchange="renderTicketList()">
+            <option value="">All assignees</option>
+            <option value="__unassigned">Unassigned</option>
+          </select>
+          <button class="btn btn-sm" id="filter-overdue" onclick="toggleOverdue()" title="Show only overdue">⏰ Overdue</button>
           <button class="btn btn-sm" onclick="loadTickets()" title="Refresh">↻</button>
         </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <input type="text" id="filter-search" placeholder="Search subject, issue, name, or email…" style="font-size:12px;padding:6px 10px" oninput="renderTicketList()">
       </div>
       <div class="ticket-list" id="ticket-list"><div class="loading-row">Loading tickets...</div></div>
       <div class="ai-section">
@@ -250,7 +258,7 @@ const CONFIG = {
 <div class="toast" id="toast"></div>
 
 <script>
-let allTickets = [], activeTicket = null;
+let allTickets = [], activeTicket = null, overdueOnly = false, refreshTimer = null;
 
 // ── AUTH ──────────────────────────────────────────────────
 function checkPassword() {
@@ -263,6 +271,7 @@ function checkPassword() {
     populateTeam();
     loadTickets();
     setLastUpdated();
+    startAutoRefresh();
   } else {
     document.getElementById('login-error').classList.add('show');
     document.getElementById('pw-input').value = '';
@@ -276,6 +285,7 @@ function logout() {
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('pw-input').value = '';
   document.getElementById('login-error').classList.remove('show');
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
 }
 
 // Auto-login if session active
@@ -287,6 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
     populateTeam();
     loadTickets();
     setLastUpdated();
+    startAutoRefresh();
   }
   document.getElementById('pw-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') checkPassword();
@@ -302,9 +313,10 @@ function setLastUpdated() {
 
 // ── TEAM ──────────────────────────────────────────────────
 function populateTeam() {
-  const sel = document.getElementById('modal-assignee');
-  sel.innerHTML = '<option value="">Unassigned</option>' +
-    CONFIG.TEAM.map(m => `<option value="${m.email}">${m.name} (${m.email})</option>`).join('');
+  const opts = CONFIG.TEAM.map(m => `<option value="${m.email}">${m.name} (${m.email})</option>`).join('');
+  document.getElementById('modal-assignee').innerHTML = '<option value="">Unassigned</option>' + opts;
+  const fa = document.getElementById('filter-assignee');
+  if (fa) fa.innerHTML = '<option value="">All assignees</option><option value="__unassigned">Unassigned</option>' + opts;
 }
 function assigneeName(email) {
   if (!email) return '';
@@ -372,9 +384,9 @@ async function atDelete(id) {
 }
 
 // ── LOAD TICKETS ──────────────────────────────────────────
-async function loadTickets() {
+async function loadTickets(silent=false) {
   const listEl = document.getElementById('ticket-list');
-  listEl.innerHTML = '<div class="loading-row">Loading...</div>';
+  if (!silent) listEl.innerHTML = '<div class="loading-row">Loading...</div>';
   try {
     const sf = document.getElementById('filter-status').value;
     const ff = document.getElementById('filter-facility').value;
@@ -397,10 +409,30 @@ async function loadTickets() {
   }
 }
 
+// Client-side refinement (search / assignee / overdue) on top of the
+// server-side status/facility/tool filters already applied in loadTickets().
+function getVisibleTickets() {
+  const q = (document.getElementById('filter-search')?.value || '').trim().toLowerCase();
+  const asg = document.getElementById('filter-assignee')?.value || '';
+  return allTickets.filter(r => {
+    const f = r.fields;
+    if (overdueOnly) { const a = agingInfo(f); if (!(a && !a.resolved && a.overdue)) return false; }
+    if (asg === '__unassigned') { if (f['Assigned To']) return false; }
+    else if (asg) { if (f['Assigned To'] !== asg) return false; }
+    if (q) {
+      const hay = [f.Subject, f.Issue, f.Name, f.Email, f.Tool, f.Facility].filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
 function renderTicketList() {
   const listEl = document.getElementById('ticket-list');
   if (!allTickets.length) { listEl.innerHTML='<div class="empty-state">No tickets found.</div>'; return; }
-  listEl.innerHTML = allTickets.map(r => {
+  const rows = getVisibleTickets();
+  if (!rows.length) { listEl.innerHTML='<div class="empty-state">No tickets match your filters.</div>'; return; }
+  listEl.innerHTML = rows.map(r => {
     const f=r.fields;
     return `<div class="ticket-item" onclick="openModal('${r.id}')">
       <div class="ticket-header">
@@ -411,6 +443,21 @@ function renderTicketList() {
       <div class="ticket-meta">${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'}</span>${agingBadge(f)}${f.Name?` · ${f.Name}`:''}${f.Email?` · ${f.Email}`:''}${f['Assigned To']?` · 👤 ${assigneeName(f['Assigned To'])}`:''}</div>
     </div>`;
   }).join('');
+}
+
+function toggleOverdue() {
+  overdueOnly = !overdueOnly;
+  document.getElementById('filter-overdue').classList.toggle('btn-primary', overdueOnly);
+  renderTicketList();
+}
+
+// Silently re-pull tickets on an interval so new/updated tickets appear without
+// a manual refresh. Skips while a ticket modal is open to avoid disruption.
+function startAutoRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    if (!document.getElementById('modal-overlay').classList.contains('show')) loadTickets(true);
+  }, 60000);
 }
 
 function updateStats(error=false) {
