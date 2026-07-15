@@ -258,6 +258,7 @@ const CONFIG = {
           <button class="btn btn-sm" onclick="setRepPreset(28)" title="Last 4 weeks">4wk</button>
           <button class="btn btn-sm" onclick="setRepPreset(90)" title="Last 90 days">90d</button>
           <button class="btn btn-sm btn-primary" onclick="loadReport()">Apply</button>
+          <button class="btn btn-sm" onclick="exportReportCSV()" title="Download tickets in range as CSV">⇩ CSV</button>
         </div>
       </div>
       <div id="rep-body"><div class="loading-row">Building report…</div></div>
@@ -297,6 +298,7 @@ const CONFIG = {
 
 <script>
 let allTickets = [], activeTicket = null, overdueOnly = false, refreshTimer = null;
+let repRecords = [], repFrom = null, repTo = null;
 
 // ── AUTH ──────────────────────────────────────────────────
 function checkPassword() {
@@ -776,8 +778,37 @@ async function loadReport(){
   body.innerHTML='<div class="loading-row">Building report…</div>';
   try {
     const records=await atGetAll();
+    repRecords=records; repFrom=from; repTo=to;   // cache for CSV export
     renderReport(computeReport(records, from, to));
   } catch(e){ body.innerHTML=`<div class="empty-state">Report error: ${e.message}</div>`; }
+}
+
+// Export the tickets submitted within the current report range as CSV.
+function exportReportCSV(){
+  if(!repFrom||!repTo){ showToast('Run a report first (click Apply).','error'); return; }
+  const rows=repRecords
+    .map(r=>({r,d:repParseDate(r.fields['Date Submitted'])}))
+    .filter(x=>x.d && x.d>=repFrom && x.d<=repTo)
+    .sort((a,b)=>b.d-a.d);
+  if(!rows.length){ showToast('No tickets in the selected range.','error'); return; }
+  const cols=['Ref','Date Submitted','Name','Email','Facility','Tool','Priority','Status','Assigned To','Resolved Date','Subject','Issue'];
+  const esc=v=>{ const s=(v==null?'':String(v)); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const lines=[cols.join(',')];
+  rows.forEach(({r})=>{
+    const f=r.fields;
+    lines.push([
+      r.id.slice(-6).toUpperCase(), f['Date Submitted'], f.Name, f.Email, f.Facility, f.Tool,
+      f.Priority, f.Status, f['Assigned To']?assigneeName(f['Assigned To']):'', f['Resolved Date'], f.Subject, f.Issue
+    ].map(esc).join(','));
+  });
+  const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const blob=new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`fbh-tickets_${iso(repFrom)}_to_${iso(repTo)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  showToast(`Exported ${rows.length} ticket${rows.length>1?'s':''}.`,'success');
 }
 
 // ── HELPERS ───────────────────────────────────────────────
