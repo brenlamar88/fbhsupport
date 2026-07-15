@@ -783,6 +783,7 @@ async function loadReport(){
   } catch(e){ body.innerHTML=`<div class="empty-state">Report error: ${e.message}</div>`; }
 }
 
+<<<<<<< HEAD
 // Export the tickets submitted within the current report range as CSV.
 function exportReportCSV(){
   if(!repFrom||!repTo){ showToast('Run a report first (click Apply).','error'); return; }
