@@ -300,6 +300,7 @@ async function submitTicket() {
     // Notify the auto-assigned owner immediately (if EmailJS is configured).
     if (assignee && CONFIG.EMAILJS.ASSIGN_TEMPLATE_ID && window.emailjs) {
       const ownerName = teamName(assignee);
+      const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const message = [
         `Hi ${ownerName||'there'},`,'',
         `A new support ticket (Ref ${ref}) has been auto-assigned to you:`,'',
@@ -311,10 +312,28 @@ async function submitTicket() {
         'Issue:', issue,'',
         '— Freedom Behavioral Health · Technology Hub'
       ].join('\n');
+      const rows = [
+        ['Reference', ref], ['From', `${name} <${email}>`], ['Facility', facility],
+        ['Tool / System', tool], ['Priority', priority], ['Status', 'Open'],
+      ];
+      const message_html = `
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.5">
+  <p style="margin:0 0 12px">Hi ${esc(ownerName||'there')},</p>
+  <p style="margin:0 0 12px">A new support ticket has been auto-assigned to you.</p>
+  <table style="border-collapse:collapse;margin:0 0 14px">
+    ${rows.map(([k,v])=>`<tr><td style="padding:4px 16px 4px 0;color:#888;white-space:nowrap;vertical-align:top">${k}</td><td style="padding:4px 0;font-weight:600">${esc(v||'—')}</td></tr>`).join('')}
+  </table>
+  <p style="margin:0 0 3px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Subject</p>
+  <p style="margin:0 0 14px">${esc(subject)}</p>
+  <p style="margin:0 0 3px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Issue</p>
+  <p style="margin:0;white-space:pre-wrap">${esc(issue)}</p>
+  <hr style="border:none;border-top:1px solid #e5e5e3;margin:16px 0">
+  <p style="margin:0;color:#888;font-size:12px">Freedom Behavioral Health · Technology Hub</p>
+</div>`.trim();
       emailjs.send(CONFIG.EMAILJS.SERVICE_ID, CONFIG.EMAILJS.ASSIGN_TEMPLATE_ID, {
         to_email: assignee, to_name: ownerName||assignee,
         subject: `[FBH Support] ${priority} — ${subject} (${facility})`,
-        message, cc_email: email, reply_to: email,
+        message, message_html, cc_email: email, reply_to: email,
         facility, tool, priority, status:'Open',
         requester_email: email, date_submitted: baseFields['Date Submitted'],
         ticket_subject: subject, issue,
