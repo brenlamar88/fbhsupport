@@ -574,7 +574,10 @@ async function assignTicket() {
   } catch(e){showToast('Failed to assign — '+e.message,'error');}
 }
 
-// Builds the subject + body shared by EmailJS and the Outlook fallback.
+function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Builds the subject, plaintext body, and structured HTML shared by EmailJS
+// and the Outlook fallback.
 function buildTicketEmail(email, f) {
   const subject=`[FBH Support] ${f.Priority||'Medium'} — ${f.Subject||f.Tool||'Ticket'} (${f.Facility||''})`;
   const body=[
@@ -590,20 +593,43 @@ function buildTicketEmail(email, f) {
     'Issue:',`${f.Issue||'—'}`,'',
     '— Freedom Behavioral Health · Technology Hub'
   ].join('\n');
-  return {subject, body};
+  const rows=[
+    ['Facility', f.Facility],
+    ['Tool / System', f.Tool],
+    ['Priority', f.Priority||'Medium'],
+    ['Status', f.Status||'Open'],
+    ['Submitted by', f.Email],
+    ['Date', f['Date Submitted']],
+  ];
+  const html=`
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.5">
+  <p style="margin:0 0 12px">Hi ${escHtml(assigneeName(email)||'there')},</p>
+  <p style="margin:0 0 12px">A support ticket has been assigned to you.</p>
+  <table style="border-collapse:collapse;margin:0 0 14px">
+    ${rows.map(([k,v])=>`<tr><td style="padding:4px 16px 4px 0;color:#888;white-space:nowrap;vertical-align:top">${k}</td><td style="padding:4px 0;font-weight:600">${escHtml(v||'—')}</td></tr>`).join('')}
+  </table>
+  <p style="margin:0 0 3px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Subject</p>
+  <p style="margin:0 0 14px">${escHtml(f.Subject||'—')}</p>
+  <p style="margin:0 0 3px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Issue</p>
+  <p style="margin:0;white-space:pre-wrap">${escHtml(f.Issue||'—')}</p>
+  <hr style="border:none;border-top:1px solid #e5e5e3;margin:16px 0">
+  <p style="margin:0;color:#888;font-size:12px">Freedom Behavioral Health · Technology Hub</p>
+</div>`.trim();
+  return {subject, body, html};
 }
 
-// Sends the assignment notification through EmailJS. The EmailJS template
-// should map these variables: {{to_email}} (recipient), {{to_name}},
-// {{subject}}, {{message}}, and optionally {{cc_email}}/{{reply_to}} plus the
-// individual fields below. Set the template's "To Email" field to {{to_email}}.
+// Sends the assignment notification through EmailJS. In the EmailJS template,
+// set "To Email" to {{to_email}}, subject to {{subject}}, and the body to
+// {{{message_html}}} (TRIPLE braces = raw HTML, gives structured layout).
+// Plaintext {{message}} and individual fields are also available as fallbacks.
 function sendAssignmentEmail(email, f) {
-  const {subject, body}=buildTicketEmail(email, f);
+  const {subject, body, html}=buildTicketEmail(email, f);
   const params={
     to_email: email,
     to_name: assigneeName(email)||email,
     subject: subject,
     message: body,
+    message_html: html,
     cc_email: f.Email||'',
     reply_to: f.Email||'',
     facility: f.Facility||'',
