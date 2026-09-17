@@ -77,6 +77,15 @@ const CONFIG = {
     CONFIRM_TEMPLATE_ID: '',                 // requester confirmation (create + paste ID)
     ASSIGN_TEMPLATE_ID: 'template_i1zrsar',  // assignee notification (existing template)
   },
+  // ── PUSH (ntfy) ── Sends a phone push on every new ticket. Subscribe to the
+  // same TOPIC in the ntfy app. NOTE: the topic is the only credential and this
+  // one is guessable, so the push deliberately contains NO requester name/email/
+  // issue text — only facility, tool, priority, and reference. Set TOPIC:'' to disable.
+  NTFY: {
+    SERVER: 'https://ntfy.sh',
+    TOPIC: 'freedom-alerts',
+    TOKEN: '',   // only needed for a self-hosted server with auth
+  },
   // ── AUTO-ROUTING ── When a ticket is submitted it is auto-assigned to an
   // owner and that owner is emailed immediately. Precedence: BY_TOOL → BY_FACILITY
   // → DEFAULT. Fill in the maps below with real owners; anything unlisted goes to
@@ -338,6 +347,24 @@ async function submitTicket() {
         requester_email: email, date_submitted: baseFields['Date Submitted'],
         ticket_subject: subject, issue,
       }, { publicKey: CONFIG.EMAILJS.PUBLIC_KEY }).catch(()=>{});
+    }
+
+    // Push a phone notification via ntfy on every new ticket. No PII in the
+    // payload (topic is a shared secret) — facility, tool, priority, ref only.
+    if (CONFIG.NTFY && CONFIG.NTFY.TOPIC) {
+      const prio = priority==='Urgent'?5 : priority==='High'?4 : priority==='Low'?2 : 3;
+      const headers = { 'Content-Type':'application/json' };
+      if (CONFIG.NTFY.TOKEN) headers['Authorization'] = 'Bearer '+CONFIG.NTFY.TOKEN;
+      fetch(CONFIG.NTFY.SERVER, {
+        method:'POST', headers,
+        body: JSON.stringify({
+          topic: CONFIG.NTFY.TOPIC,
+          title: `New ${priority} ticket — ${facility}`,
+          message: `${tool}${ref?` · Ref ${ref}`:''}\nOpen the admin dashboard for details.`,
+          priority: prio,
+          tags: [priority==='Urgent'?'rotating_light':'ticket']
+        })
+      }).catch(()=>{});
     }
 
     // Show success
