@@ -637,6 +637,8 @@ function sendAssignmentEmail(email, f) {
     priority: f.Priority||'Medium',
     status: f.Status||'Open',
     requester_email: f.Email||'',
+    requester_name: f.Name||'',
+    ref: (activeTicket && activeTicket.id) ? activeTicket.id.slice(-6).toUpperCase() : '',
     date_submitted: f['Date Submitted']||'',
     ticket_subject: f.Subject||'',
     issue: f.Issue||'',

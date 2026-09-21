@@ -343,6 +343,7 @@ async function submitTicket() {
         to_email: assignee, to_name: ownerName||assignee,
         subject: `[FBH Support] ${priority} — ${subject} (${facility})`,
         message, message_html, cc_email: email, reply_to: email,
+        ref, requester_name: name,
         facility, tool, priority, status:'Open',
         requester_email: email, date_submitted: baseFields['Date Submitted'],
         ticket_subject: subject, issue,
