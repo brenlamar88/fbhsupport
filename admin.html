@@ -40,6 +40,7 @@
   .tool-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px}
   .tool-name{font-size:13px;font-weight:600;color:#1a1a1a}
   .tool-desc{font-size:11px;color:#888;line-height:1.4}
+  .tool-card.disabled{opacity:.55;filter:grayscale(.75);cursor:not-allowed;pointer-events:none}
   .card{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:1.25rem;min-width:0;overflow:hidden}
   .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
   .stat{background:#f5f5f3;border-radius:8px;padding:10px;text-align:center}
@@ -167,6 +168,8 @@ const CONFIG = {
     { name:'RAP', url:'https://rap.freedomhc.com', desc:'Digital RAP system', icon:'📋', bg:'#EAF3DE' },
     { name:'PIP', url:'https://pip.v8techco.com', desc:'Performance improvement', icon:'📈', bg:'#EEEDFE' },
     { name:'POP', url:'https://freedom.v8techco.com', desc:'Outcomes & planning', icon:'📊', bg:'#FBEAF0' },
+    { name:'RTBH', desc:'Coming soon', icon:'🏥', bg:'#EAF3DE', disabled:true },
+    { name:'Work Orders', desc:'Coming soon', icon:'🛠️', bg:'#FAEEDA', disabled:true },
   ]
 };
 </script>
@@ -383,6 +386,13 @@ function renderTools() {
         </div>
         <div class="tool-desc">${t.desc}</div>
         <div class="dropdown-menu">${items}</div>
+      </div>`;
+    }
+    if (t.disabled) {
+      return `<div class="tool-card disabled" title="Coming soon">
+        <div class="tool-icon" style="background:${t.bg}">${t.icon}</div>
+        <div class="tool-name">${t.name}</div>
+        <div class="tool-desc">${t.desc||'Coming soon'}</div>
       </div>`;
     }
     return `<a class="tool-card" href="${t.url}" target="_blank" rel="noopener">
