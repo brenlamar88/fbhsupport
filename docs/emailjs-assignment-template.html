@@ -6,12 +6,15 @@
   2. Click the CONTENT box, then switch the editor to CODE / HTML view
      (the < > button in the toolbar).
   3. Select all, delete, and paste EVERYTHING below the divider line.
-  4. Set the template's  Subject  field to:   {{subject}}
+  4. Set the template's  Subject   field to:  {{subject}}
      Set the template's  To Email  field to:  {{to_email}}
+     Set the template's  Cc        field to:  {{cc_email}}    (copies the submitter)
+     Set the template's  Reply To  field to:  {{reply_to}}    (replies go to the submitter)
   5. Save.  Assign a test ticket — the email will now be neatly formatted.
 
   The app already sends all of these variables:
     {{to_name}} {{ref}} {{requester_name}} {{requester_email}}
+    {{cc_email}} {{reply_to}}
     {{facility}} {{tool}} {{priority}} {{status}} {{date_submitted}}
     {{subject}} {{issue}}
   ================= PASTE FROM HERE DOWN ================= -->
