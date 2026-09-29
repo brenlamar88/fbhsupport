@@ -45,8 +45,12 @@ the connected Airtable connector. Each ticket has these fields:
 When a ticket matches one of these, summarize it, name the skill you'd use, show exactly what
 you'd do, and **wait for Bren's approval before executing**:
 
-- **Password reset / locked out / can't sign in** (Outlook, Teams, Office, M365, NetSfere) →
-  use the **`m365-password-reset`** skill. Verify the target user and facility first.
+- **Password reset — Microsoft 365** (Outlook, Teams, Office, M365 sign-in) →
+  use the **`m365-password-reset`** skill.
+- **Password reset — RAP or BlackOps** (rap.freedomhc.com, *.blkops.com) →
+  use the **`fbh-app-password-reset`** skill (sets a temp password and emails it). First
+  confirm the exact account and that the requester is authorized.
+- **Password reset — PIP or POP** → no automated skill yet; escalate to Bren to handle.
 - **New BlackOps user / access to a *.blkops.com site** → use the **`blkops-create-user`** skill.
 - **New PIP or RAP user / "give X access to RAP/PIP"** → use the **`pip-rap-create-user`** skill.
 
