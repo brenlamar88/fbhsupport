@@ -527,7 +527,7 @@ function openModal(id) {
   document.getElementById('modal-meta').innerHTML=`
     <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
     <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'} priority</span>${agingBadge(f)}
-    <span>${f.Facility||''}</span>${f.Name?`<span>🧑 ${f.Name}</span>`:''}${f.Email?`<span>📧 ${f.Email}</span>`:''}${f['Assigned To']?`<span>👤 ${assigneeName(f['Assigned To'])}</span>`:''}
+    <span>${f.Facility||''}</span>${f.Name?`<span>🧑 ${f.Name}</span>`:''}${f.Email?`<span>📧 ${f.Email}</span>`:''}${f['Contact Number']?`<span>📞 ${f['Contact Number']}</span>`:''}${f['Assigned To']?`<span>👤 ${assigneeName(f['Assigned To'])}</span>`:''}
     <span>${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''}</span>`;
   document.getElementById('modal-body').innerHTML='<strong>'+(f.Tool||'')+'</strong><br><br>'+(f.Issue||'');
   document.getElementById('modal-status').value=f.Status||'Open';
@@ -829,13 +829,13 @@ function exportReportCSV(){
     .filter(x=>x.d && x.d>=repFrom && x.d<=repTo)
     .sort((a,b)=>b.d-a.d);
   if(!rows.length){ showToast('No tickets in the selected range.','error'); return; }
-  const cols=['Ref','Date Submitted','Name','Email','Facility','Tool','Priority','Status','Assigned To','Resolved Date','Subject','Issue'];
+  const cols=['Ref','Date Submitted','Name','Email','Contact Number','Facility','Tool','Priority','Status','Assigned To','Resolved Date','Subject','Issue'];
   const esc=v=>{ const s=(v==null?'':String(v)); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
   const lines=[cols.join(',')];
   rows.forEach(({r})=>{
     const f=r.fields;
     lines.push([
-      r.id.slice(-6).toUpperCase(), f['Date Submitted'], f.Name, f.Email, f.Facility, f.Tool,
+      r.id.slice(-6).toUpperCase(), f['Date Submitted'], f.Name, f.Email, f['Contact Number'], f.Facility, f.Tool,
       f.Priority, f.Status, f['Assigned To']?assigneeName(f['Assigned To']):'', f['Resolved Date'], f.Subject, f.Issue
     ].map(esc).join(','));
   });

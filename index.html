@@ -149,6 +149,10 @@ const CONFIG = {
         <input type="email" id="f-email" placeholder="your@email.com">
       </div>
       <div class="form-row">
+        <label class="form-label">Contact number</label>
+        <input type="tel" id="f-phone" placeholder="(optional) e.g. 318-555-0123">
+      </div>
+      <div class="form-row">
         <label class="form-label">Facility</label>
         <select id="f-facility">
           <option value="">Select facility...</option>
@@ -258,6 +262,7 @@ const AT_HEADERS = { 'Authorization': `Bearer ${CONFIG.AIRTABLE_TOKEN}`, 'Conten
 async function submitTicket() {
   const name = document.getElementById('f-name').value.trim();
   const email = document.getElementById('f-email').value.trim();
+  const phone = document.getElementById('f-phone').value.trim();
   const facility = document.getElementById('f-facility').value;
   const tool = document.getElementById('f-tool').value;
   const subject = document.getElementById('f-subject').value.trim();
@@ -288,23 +293,34 @@ async function submitTicket() {
   async function createRecord(fields) {
     const res = await fetch(AT_BASE, { method:'POST', headers:AT_HEADERS, body:JSON.stringify({fields}) });
     if (!res.ok) {
-      let type=''; try { type=(await res.json())?.error?.type||''; } catch(_){}
-      const err = new Error(`Airtable ${res.status}`); err.type=type; throw err;
+      let type='', detail=''; try { const j=await res.json(); type=j?.error?.type||''; detail=j?.error?.message||''; } catch(_){}
+      const err = new Error(`Airtable ${res.status}`); err.type=type; err.detail=detail; throw err;
     }
     return res.json();
   }
 
-  try {
-    let record;
-    try {
-      // Include the submitter's name so admins see a person, not just an email.
-      record = await createRecord({ ...baseFields, "Name": name });
-    } catch(e) {
-      // If the base has no "Name" field yet, don't fail the submission — retry
-      // without it. (Add a "Name" single-line-text field in Airtable to store it.)
-      if (e.type === 'UNKNOWN_FIELD_NAME') record = await createRecord(baseFields);
-      else throw e;
+  // Create the record, but if the base is missing an optional field (e.g. "Name"
+  // or "Contact Number" hasn't been added yet), drop just that field and retry so
+  // the submission still succeeds. Add the matching fields in Airtable to store them.
+  async function createRecordResilient(fields) {
+    let f = { ...fields };
+    for (let i = 0; i < 5; i++) {
+      try { return await createRecord(f); }
+      catch(e) {
+        if (e.type !== 'UNKNOWN_FIELD_NAME') throw e;
+        const m = /Unknown field name:\s*"?([^"]+)"?/i.exec(e.detail || '');
+        const bad = m && m[1];
+        if (bad && bad in f) { delete f[bad]; continue; }
+        delete f['Name']; delete f['Contact Number']; // last-resort: strip optionals
+      }
     }
+    return await createRecord(f);
+  }
+
+  try {
+    const fields = { ...baseFields, "Name": name };
+    if (phone) fields["Contact Number"] = phone;
+    const record = await createRecordResilient(fields);
 
     // Human-friendly reference from the created record id.
     const ref = record?.id ? record.id.slice(-6).toUpperCase() : '';
@@ -324,6 +340,7 @@ async function submitTicket() {
         `Hi ${ownerName||'there'},`,'',
         `A new support ticket (Ref ${ref}) has been auto-assigned to you:`,'',
         `From:     ${name} <${email}>`,
+        ...(phone ? [`Phone:    ${phone}`] : []),
         `Facility: ${facility}`,
         `Tool:     ${tool}`,
         `Priority: ${priority}`,'',
@@ -332,7 +349,9 @@ async function submitTicket() {
         '— Freedom Behavioral Health · Technology Hub'
       ].join('\n');
       const rows = [
-        ['Reference', ref], ['From', `${name} <${email}>`], ['Facility', facility],
+        ['Reference', ref], ['From', `${name} <${email}>`],
+        ...(phone ? [['Phone', phone]] : []),
+        ['Facility', facility],
         ['Tool / System', tool], ['Priority', priority], ['Status', 'Open'],
       ];
       const message_html = `
@@ -353,7 +372,7 @@ async function submitTicket() {
         to_email: assignee, to_name: ownerName||assignee,
         subject: `[FBH Support] ${priority} — ${subject} (${facility})`,
         message, message_html, cc_email: email, reply_to: email,
-        ref, requester_name: name,
+        ref, requester_name: name, contact_number: phone,
         facility, tool, priority, status:'Open',
         requester_email: email, date_submitted: baseFields['Date Submitted'],
         ticket_subject: subject, issue,
@@ -384,6 +403,7 @@ async function submitTicket() {
     document.getElementById('success-detail').innerHTML =
       `${ref?`<strong>Reference #:</strong> ${ref}<br>`:''}
        <strong>Name:</strong> ${name}<br>
+       ${phone?`<strong>Contact #:</strong> ${phone}<br>`:''}
        <strong>Facility:</strong> ${facility}<br>
        <strong>Tool:</strong> ${tool}<br>
        <strong>Subject:</strong> ${subject}<br>
@@ -399,7 +419,7 @@ async function submitTicket() {
 }
 
 function resetForm() {
-  ['f-name','f-email','f-facility','f-tool','f-subject','f-issue'].forEach(id => document.getElementById(id).value = '');
+  ['f-name','f-email','f-phone','f-facility','f-tool','f-subject','f-issue'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-priority').value = 'Medium';
   document.getElementById('submit-btn').disabled = false;
   document.getElementById('submit-btn').textContent = 'Submit Ticket';
