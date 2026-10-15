@@ -150,7 +150,7 @@ const CONFIG = {
       </div>
       <div class="form-row">
         <label class="form-label">Contact number</label>
-        <input type="tel" id="f-phone" placeholder="(optional) e.g. 318-555-0123">
+        <input type="tel" id="f-phone" placeholder="e.g. 318-555-0123">
       </div>
       <div class="form-row">
         <label class="form-label">Facility</label>
@@ -269,7 +269,7 @@ async function submitTicket() {
   const issue = document.getElementById('f-issue').value.trim();
   const priority = document.getElementById('f-priority').value;
 
-  if (!name || !email || !facility || !tool || !subject || !issue) {
+  if (!name || !email || !phone || !facility || !tool || !subject || !issue) {
     showToast('Please fill in all fields.', 'error'); return;
   }
 
