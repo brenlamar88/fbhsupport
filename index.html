@@ -291,27 +291,33 @@ async function submitTicket() {
   if (assignee) baseFields["Assigned To"] = assignee;
 
   async function createRecord(fields) {
-    const res = await fetch(AT_BASE, { method:'POST', headers:AT_HEADERS, body:JSON.stringify({fields}) });
+    // typecast lets Airtable coerce values / auto-add select options instead of
+    // rejecting the whole write (e.g. a new Tool option not yet in the base).
+    const res = await fetch(AT_BASE, { method:'POST', headers:AT_HEADERS, body:JSON.stringify({fields, typecast:true}) });
     if (!res.ok) {
-      let type='', detail=''; try { const j=await res.json(); type=j?.error?.type||''; detail=j?.error?.message||''; } catch(_){}
-      const err = new Error(`Airtable ${res.status}`); err.type=type; err.detail=detail; throw err;
+      let type='', detail=''; try { const j=await res.json(); type=j?.error?.type||''; detail=j?.error?.message||j?.error?.type||''; } catch(_){}
+      const err = new Error(`Airtable ${res.status}${detail?': '+detail:''}`); err.status=res.status; err.type=type; err.detail=detail; throw err;
     }
     return res.json();
   }
 
-  // Create the record, but if the base is missing an optional field (e.g. "Name"
-  // or "Contact Number" hasn't been added yet), drop just that field and retry so
-  // the submission still succeeds. Add the matching fields in Airtable to store them.
+  // Create the record. If an OPTIONAL field (Name / Contact Number) causes the
+  // write to fail — because the base is missing it, or its type rejects the
+  // value — drop just that field and retry so the core ticket still goes through.
+  // Auth/connection errors (401/403) can't be fixed this way, so they surface.
   async function createRecordResilient(fields) {
+    const OPTIONAL = ['Name', 'Contact Number'];
     let f = { ...fields };
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       try { return await createRecord(f); }
       catch(e) {
-        if (e.type !== 'UNKNOWN_FIELD_NAME') throw e;
-        const m = /Unknown field name:\s*"?([^"]+)"?/i.exec(e.detail || '');
-        const bad = m && m[1];
-        if (bad && bad in f) { delete f[bad]; continue; }
-        delete f['Name']; delete f['Contact Number']; // last-resort: strip optionals
+        if (e.status === 401 || e.status === 403) throw e;       // auth — not a field issue
+        const named = OPTIONAL.find(k => k in f && (e.detail || '').includes(k));
+        if (named) { delete f[named]; continue; }                // drop the named optional field
+        let stripped = false;                                     // else strip remaining optionals and retry
+        for (const k of OPTIONAL) { if (k in f) { delete f[k]; stripped = true; } }
+        if (stripped) continue;
+        throw e;
       }
     }
     return await createRecord(f);
@@ -412,7 +418,7 @@ async function submitTicket() {
     document.getElementById('success-card').classList.add('show');
 
   } catch(e) {
-    showToast('Submission failed. Please try again.', 'error');
+    showToast('Submission failed — ' + (e.message || 'please try again'), 'error');
     btn.disabled = false;
     btn.textContent = 'Submit Ticket';
   }
