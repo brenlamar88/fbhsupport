@@ -512,12 +512,14 @@ function toggleOverdue() {
 }
 
 // Silently re-pull tickets on an interval so new/updated tickets appear without
-// a manual refresh. Skips while a ticket modal is open to avoid disruption.
+// a manual refresh. Skips while a ticket modal is open. Interval is deliberately
+// long (5 min) to keep the dashboard well under Airtable's ~5 req/sec per-base
+// rate limit — frequent polling was helping saturate the base.
 function startAutoRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(() => {
     if (!document.getElementById('modal-overlay').classList.contains('show')) loadTickets(true);
-  }, 60000);
+  }, 300000);
 }
 
 function updateStats(error=false) {
@@ -746,7 +748,16 @@ function setRepPreset(days){
   document.getElementById('rep-from').value=iso(from);
   loadReport();
 }
-function initReport(){ setRepPreset(28); }
+// Pre-fill the report date range but DON'T auto-run the full-base scan on login —
+// it loads only when the admin clicks Apply, to spare the base's rate limit.
+function initReport(){
+  const to=new Date(), from=new Date(); from.setDate(from.getDate()-27);
+  const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('rep-to').value=iso(to);
+  document.getElementById('rep-from').value=iso(from);
+  const body=document.getElementById('rep-body');
+  if(body) body.innerHTML='<div class="loading-row">Pick a range and click Apply to build the report.</div>';
+}
 
 function computeReport(records, from, to){
   const inR=d=>d && d>=from && d<=to;

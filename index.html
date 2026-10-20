@@ -312,7 +312,8 @@ async function submitTicket() {
       try { return await createRecord(f); }
       catch(e) {
         if (e.status === 429) {                                   // rate limited — wait, retry same payload
-          await new Promise(r => setTimeout(r, Math.min(2000 * (i + 1), 6000)));
+          btn.innerHTML = '<span class="spinner"></span>System busy — retrying…';
+          await new Promise(r => setTimeout(r, Math.min(1500 * (i + 1), 4000)));
           continue;
         }
         if (e.status === 401 || e.status === 403) throw e;       // auth — not a field issue
