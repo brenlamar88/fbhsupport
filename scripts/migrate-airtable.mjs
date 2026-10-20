@@ -68,7 +68,7 @@ for (const r of all) {
       r.id, str(f.Name), str(f.Email), str(f['Contact Number']), str(f.Facility),
       str(f.Tool), str(f.Subject), str(f.Issue), str(f.Priority || 'Medium'),
       str(f.Status || 'Open'), str(f['Assigned To']),
-      date(f['Date Submitted']), date(f['Resolved Date']), r.createdTime || null
+      date(f['Date Submitted']) || date(r.createdTime), date(f['Resolved Date']), r.createdTime || null
     ]
   );
   saved++;
