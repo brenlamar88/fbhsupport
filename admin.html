@@ -415,10 +415,17 @@ document.addEventListener('click', () => { document.querySelectorAll('.dropdown-
 const AT_BASE = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CONFIG.AIRTABLE_TABLE)}`;
 const AT_HEADERS = { 'Authorization': `Bearer ${CONFIG.AIRTABLE_TOKEN}`, 'Content-Type': 'application/json' };
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function atGet(params='') {
-  const res = await fetch(AT_BASE+(params?'?'+params:''), {headers:AT_HEADERS});
-  if (!res.ok) throw new Error(`Airtable ${res.status}`);
-  return res.json();
+  // Retry on 429 (Airtable's ~5 req/sec per-base rate limit) so dashboard reads
+  // back off instead of hammering the base and worsening the limit.
+  for (let i = 0; i < 4; i++) {
+    const res = await fetch(AT_BASE+(params?'?'+params:''), {headers:AT_HEADERS});
+    if (res.status === 429) { await sleep(1500 * (i + 1)); continue; }
+    if (!res.ok) throw new Error(`Airtable ${res.status}`);
+    return res.json();
+  }
+  throw new Error('Airtable 429');
 }
 async function atPatch(id, fields) {
   const res = await fetch(`${AT_BASE}/${id}`, {method:'PATCH',headers:AT_HEADERS,body:JSON.stringify({fields})});
@@ -453,6 +460,7 @@ async function loadTickets(silent=false) {
     do {
       let p=bp; if(offset) p+=`&offset=${offset}`;
       const data=await atGet(p); records=records.concat(data.records||[]); offset=data.offset||null;
+      if(offset) await sleep(250);   // stay under Airtable's ~5 req/sec limit
     } while(offset);
     allTickets=records; renderTicketList(); updateStats(); setLastUpdated();
   } catch(e) {
@@ -727,7 +735,7 @@ function repFmt(d){ return d.toLocaleDateString('en-US',{month:'short',day:'nume
 async function atGetAll(){
   let records=[], offset=null;
   const bp='sort[0][field]=Date Submitted&sort[0][direction]=desc';
-  do { let p=bp; if(offset)p+=`&offset=${offset}`; const data=await atGet(p); records=records.concat(data.records||[]); offset=data.offset||null; } while(offset);
+  do { let p=bp; if(offset)p+=`&offset=${offset}`; const data=await atGet(p); records=records.concat(data.records||[]); offset=data.offset||null; if(offset) await sleep(250); } while(offset);
   return records;
 }
 
