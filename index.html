@@ -61,56 +61,9 @@
 </style>
 </head>
 <body>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
 const CONFIG = {
-  AIRTABLE_TOKEN: 'patz8kSMjhVRGMzp6.3aa05554e02233d38e547fba584b4d047385aee6af6ff06758256b813a840488',
-  AIRTABLE_BASE_ID: 'appOQI2Im5XebeIyg',
-  AIRTABLE_TABLE: 'tblEMz0BecYmu48y0',
-  // ── EMAIL (EmailJS) ── Sends a confirmation email to the person who submits
-  // a ticket. Create a second EmailJS template (e.g. "ticket confirmation") and
-  // paste its ID into CONFIRM_TEMPLATE_ID below. Leave it '' to disable.
-  // Template variables sent: {{to_email}} (set as the template's To Email),
-  // {{to_name}}, {{ref}}, {{subject}}, {{facility}}, {{tool}}, {{priority}}, {{issue}}.
-  EMAILJS: {
-    SERVICE_ID: 'service_ucspnwu',
-    PUBLIC_KEY: 'BbYLdPAgSRvGaUdGq',
-    CONFIRM_TEMPLATE_ID: '',                 // requester confirmation (create + paste ID)
-    ASSIGN_TEMPLATE_ID: 'template_i1zrsar',  // assignee notification (existing template)
-  },
-  // ── PUSH (ntfy) ── Sends a phone push on every new ticket. Subscribe to the
-  // same TOPIC in the ntfy app. NOTE: the topic is the only credential and this
-  // one is guessable, so the push deliberately contains NO requester name/email/
-  // issue text — only facility, tool, priority, and reference. Set TOPIC:'' to disable.
-  NTFY: {
-    SERVER: 'https://ntfy.sh',
-    TOPIC: 'fbh-alerts-9f3k2p',
-    TOKEN: '',   // only needed for a self-hosted server with auth
-  },
-  // ── AUTO-ROUTING ── When a ticket is submitted it is auto-assigned to an
-  // owner and that owner is emailed immediately. Precedence: BY_TOOL → BY_FACILITY
-  // → DEFAULT. Fill in the maps below with real owners; anything unlisted goes to
-  // DEFAULT. Set ENABLED:false to turn auto-routing off.
-  ROUTING: {
-    ENABLED: true,
-    DEFAULT: 'broberts@freedomhc.com',   // everything else → Bren Roberts
-    BY_TOOL: {
-      'BlackOps': 'broberts@freedomhc.com',        // Bren
-      'SharePoint': 'bryder@freedomhc.com',         // Braden
-      'Email': 'support@freedomhc.com',
-      'Other / General IT': 'support@freedomhc.com',
-    },
-    BY_FACILITY: {
-      // 'Monroe': 'someone@freedomhc.com',
-    },
-  },
-  // Name lookup for email greetings (mirror of admin TEAM).
-  TEAM: [
-    { name:'Bren Roberts',  email:'broberts@freedomhc.com' },
-    { name:'Braden Ryder',  email:'bryder@freedomhc.com' },
-    { name:'IT Support',    email:'support@freedomhc.com' },
-    { name:'Help Desk',     email:'helpdesk@freedomhc.com' },
-  ],
+  // All ticket writes, routing, notifications and credentials now live on the server.
   TOOLS: [
     { name:'BlackOps', desc:'Operations CRM', icon:'🖥', bg:'#E6F1FB', dropdown:true, locations:['Monroe','Magnolia','Bastrop','Bunkie','Minden','Dequincy','Plainview','Greenville','Villeplatte','Ferriday','Leesville','LakeCharles'] },
     { name:'Broken Process', url:'https://freedombehavioral.vercel.app', desc:'Report broken workflows', icon:'⚠️', bg:'#FAEEDA' },
@@ -256,9 +209,7 @@ function toggleDropdown(e, card) {
 }
 document.addEventListener('click', () => { document.querySelectorAll('.dropdown-card.open').forEach(c => c.classList.remove('open')); });
 
-const AT_BASE = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CONFIG.AIRTABLE_TABLE)}`;
-const AT_HEADERS = { 'Authorization': `Bearer ${CONFIG.AIRTABLE_TOKEN}`, 'Content-Type': 'application/json' };
-
+// The form posts to the same-origin Vercel Function. No database credentials are exposed.
 async function submitTicket() {
   const name = document.getElementById('f-name').value.trim();
   const email = document.getElementById('f-email').value.trim();
@@ -268,165 +219,39 @@ async function submitTicket() {
   const subject = document.getElementById('f-subject').value.trim();
   const issue = document.getElementById('f-issue').value.trim();
   const priority = document.getElementById('f-priority').value;
-
   if (!name || !email || !phone || !facility || !tool || !subject || !issue) {
     showToast('Please fill in all fields.', 'error'); return;
   }
-
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Submitting...';
-
-  // Auto-routing: decide the owner for this ticket (Tool → Facility → default).
-  const r = CONFIG.ROUTING;
-  const assignee = (r && r.ENABLED)
-    ? (r.BY_TOOL[tool] || r.BY_FACILITY[facility] || r.DEFAULT || '')
-    : '';
-
-  const baseFields = {
-    "Subject": subject, "Email": email, "Issue": issue,
-    "Priority": priority, "Status": "Open", "Facility": facility,
-    "Tool": tool, "Date Submitted": new Date().toISOString().split('T')[0]
+  const fields = {
+    Name: name, Email: email, 'Contact Number': phone, Facility: facility,
+    Tool: tool, Subject: subject, Issue: issue, Priority: priority
   };
-  if (assignee) baseFields["Assigned To"] = assignee;
-
-  async function createRecord(fields) {
-    // typecast lets Airtable coerce values / auto-add select options instead of
-    // rejecting the whole write (e.g. a new Tool option not yet in the base).
-    const res = await fetch(AT_BASE, { method:'POST', headers:AT_HEADERS, body:JSON.stringify({fields, typecast:true}) });
-    if (!res.ok) {
-      let type='', detail=''; try { const j=await res.json(); type=j?.error?.type||''; detail=j?.error?.message||j?.error?.type||''; } catch(_){}
-      const err = new Error(`Airtable ${res.status}${detail?': '+detail:''}`); err.status=res.status; err.type=type; err.detail=detail; throw err;
-    }
-    return res.json();
-  }
-
-  // Create the record. If an OPTIONAL field (Name / Contact Number) causes the
-  // write to fail — because the base is missing it, or its type rejects the
-  // value — drop just that field and retry so the core ticket still goes through.
-  // Auth/connection errors (401/403) can't be fixed this way, so they surface.
-  async function createRecordResilient(fields) {
-    const OPTIONAL = ['Name', 'Contact Number'];
-    let f = { ...fields };
-    for (let i = 0; i < 6; i++) {
-      try { return await createRecord(f); }
-      catch(e) {
-        if (e.status === 429) {                                   // rate limited — wait, retry same payload
-          btn.innerHTML = '<span class="spinner"></span>System busy — retrying…';
-          await new Promise(r => setTimeout(r, Math.min(1500 * (i + 1), 4000)));
-          continue;
-        }
-        if (e.status === 401 || e.status === 403) throw e;       // auth — not a field issue
-        const named = OPTIONAL.find(k => k in f && (e.detail || '').includes(k));
-        if (named) { delete f[named]; continue; }                // drop the named optional field
-        let stripped = false;                                     // else strip remaining optionals and retry
-        for (const k of OPTIONAL) { if (k in f) { delete f[k]; stripped = true; } }
-        if (stripped) continue;
-        throw e;
-      }
-    }
-    return await createRecord(f);
-  }
-
   try {
-    const fields = { ...baseFields, "Name": name };
-    if (phone) fields["Contact Number"] = phone;
-    const record = await createRecordResilient(fields);
-
-    // Human-friendly reference from the created record id.
-    const ref = record?.id ? record.id.slice(-6).toUpperCase() : '';
-
-    // Send a confirmation email to the requester (if EmailJS is configured).
-    if (CONFIG.EMAILJS.CONFIRM_TEMPLATE_ID && window.emailjs) {
-      emailjs.send(CONFIG.EMAILJS.SERVICE_ID, CONFIG.EMAILJS.CONFIRM_TEMPLATE_ID, {
-        to_email: email, to_name: name, ref, subject, facility, tool, priority, issue
-      }, { publicKey: CONFIG.EMAILJS.PUBLIC_KEY }).catch(()=>{});
-    }
-
-    // Notify the auto-assigned owner immediately (if EmailJS is configured).
-    if (assignee && CONFIG.EMAILJS.ASSIGN_TEMPLATE_ID && window.emailjs) {
-      const ownerName = teamName(assignee);
-      const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      const message = [
-        `Hi ${ownerName||'there'},`,'',
-        `A new support ticket (Ref ${ref}) has been auto-assigned to you:`,'',
-        `From:     ${name} <${email}>`,
-        ...(phone ? [`Phone:    ${phone}`] : []),
-        `Facility: ${facility}`,
-        `Tool:     ${tool}`,
-        `Priority: ${priority}`,'',
-        `Subject: ${subject}`,'',
-        'Issue:', issue,'',
-        '— Freedom Behavioral Health · Technology Hub'
-      ].join('\n');
-      const rows = [
-        ['Reference', ref], ['From', `${name} <${email}>`],
-        ...(phone ? [['Phone', phone]] : []),
-        ['Facility', facility],
-        ['Tool / System', tool], ['Priority', priority], ['Status', 'Open'],
-      ];
-      const message_html = `
-<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.5">
-  <p style="margin:0 0 12px">Hi ${esc(ownerName||'there')},</p>
-  <p style="margin:0 0 12px">A new support ticket has been auto-assigned to you.</p>
-  <table style="border-collapse:collapse;margin:0 0 14px">
-    ${rows.map(([k,v])=>`<tr><td style="padding:4px 16px 4px 0;color:#888;white-space:nowrap;vertical-align:top">${k}</td><td style="padding:4px 0;font-weight:600">${esc(v||'—')}</td></tr>`).join('')}
-  </table>
-  <p style="margin:0 0 3px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Subject</p>
-  <p style="margin:0 0 14px">${esc(subject)}</p>
-  <p style="margin:0 0 3px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Issue</p>
-  <p style="margin:0;white-space:pre-wrap">${esc(issue)}</p>
-  <hr style="border:none;border-top:1px solid #e5e5e3;margin:16px 0">
-  <p style="margin:0;color:#888;font-size:12px">Freedom Behavioral Health · Technology Hub</p>
-</div>`.trim();
-      emailjs.send(CONFIG.EMAILJS.SERVICE_ID, CONFIG.EMAILJS.ASSIGN_TEMPLATE_ID, {
-        to_email: assignee, to_name: ownerName||assignee,
-        subject: `[FBH Support] ${priority} — ${subject} (${facility})`,
-        message, message_html, cc_email: email, reply_to: email,
-        ref, requester_name: name, contact_number: phone,
-        facility, tool, priority, status:'Open',
-        requester_email: email, date_submitted: baseFields['Date Submitted'],
-        ticket_subject: subject, issue,
-      }, { publicKey: CONFIG.EMAILJS.PUBLIC_KEY }).catch(()=>{});
-    }
-
-    // Push a phone notification via ntfy on every new ticket. Topic is an
-    // unguessable shared secret; includes a short issue preview for context.
-    if (CONFIG.NTFY && CONFIG.NTFY.TOPIC) {
-      const prio = priority==='Urgent'?5 : priority==='High'?4 : priority==='Low'?2 : 3;
-      const headers = { 'Content-Type':'application/json' };
-      if (CONFIG.NTFY.TOKEN) headers['Authorization'] = 'Bearer '+CONFIG.NTFY.TOKEN;
-      const preview = issue ? (issue.length>140 ? issue.slice(0,140).trim()+'…' : issue) : '';
-      fetch(CONFIG.NTFY.SERVER, {
-        method:'POST', headers,
-        body: JSON.stringify({
-          topic: CONFIG.NTFY.TOPIC,
-          title: `New ${priority} ticket — ${facility}`,
-          message: `${tool}${ref?` · Ref ${ref}`:''}${preview?`\n\n${preview}`:''}\n\nOpen the admin dashboard for details.`,
-          priority: prio,
-          tags: [priority==='Urgent'?'rotating_light':'ticket']
-        })
-      }).catch(()=>{});
-    }
-
-    // Show success
+    const res = await fetch('/api/tickets', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({fields})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Please try again.');
+    const ref = data.id ? data.id.slice(-6).toUpperCase() : '';
+    const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     document.getElementById('form-card').style.display = 'none';
     document.getElementById('success-detail').innerHTML =
-      `${ref?`<strong>Reference #:</strong> ${ref}<br>`:''}
-       <strong>Name:</strong> ${name}<br>
-       ${phone?`<strong>Contact #:</strong> ${phone}<br>`:''}
-       <strong>Facility:</strong> ${facility}<br>
-       <strong>Tool:</strong> ${tool}<br>
-       <strong>Subject:</strong> ${subject}<br>
-       <strong>Priority:</strong> ${priority}<br>
-       <strong>Submitted:</strong> ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+      (ref ? '<strong>Reference #:</strong> ' + esc(ref) + '<br>' : '') +
+      '<strong>Name:</strong> ' + esc(name) + '<br>' +
+      '<strong>Contact #:</strong> ' + esc(phone) + '<br>' +
+      '<strong>Facility:</strong> ' + esc(facility) + '<br>' +
+      '<strong>Tool:</strong> ' + esc(tool) + '<br>' +
+      '<strong>Subject:</strong> ' + esc(subject) + '<br>' +
+      '<strong>Priority:</strong> ' + esc(priority) + '<br>' +
+      '<strong>Submitted:</strong> ' + new Date().toLocaleDateString('en-US');
     document.getElementById('success-card').classList.add('show');
-
-  } catch(e) {
-    const msg = e.status === 429
-      ? 'System is busy right now — please wait a few seconds and submit again.'
-      : 'Submission failed — ' + (e.message || 'please try again');
-    showToast(msg, 'error');
+  } catch (e) {
+    showToast('Submission failed — ' + e.message, 'error');
     btn.disabled = false;
     btn.textContent = 'Submit Ticket';
   }

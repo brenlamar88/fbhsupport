@@ -137,25 +137,9 @@
 </style>
 </head>
 <body>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
 const CONFIG = {
-  ADMIN_PASSWORD: 'FBH2020!',
-  AIRTABLE_TOKEN: 'patz8kSMjhVRGMzp6.3aa05554e02233d38e547fba584b4d047385aee6af6ff06758256b813a840488',
-  AIRTABLE_BASE_ID: 'appOQI2Im5XebeIyg',
-  AIRTABLE_TABLE: 'tblEMz0BecYmu48y0',
-  ANTHROPIC_KEY: 'YOUR_ANTHROPIC_API_KEY',
-  // ── EMAIL (EmailJS) ── Sends an automatic notification when a ticket is
-  // assigned. Set ENABLED:false to turn auto-emails off and fall back to the
-  // Outlook compose tab. Template variable names are documented in sendAssignmentEmail().
-  EMAILJS: {
-    ENABLED: true,
-    SERVICE_ID: 'service_ucspnwu',
-    TEMPLATE_ID: 'template_i1zrsar',
-    PUBLIC_KEY: 'BbYLdPAgSRvGaUdGq',
-  },
-  // ── TEAM ── Edit this list with your real team members. Tickets can be
-  // assigned to anyone here, and "Notify assignee" emails the matching address.
+  // All database, authentication and third-party service secrets stay on the server.
   TEAM: [
     { name:'Bren Roberts',  email:'broberts@freedomhc.com' },
     { name:'Braden Ryder',  email:'bryder@freedomhc.com' },
@@ -303,50 +287,43 @@ const CONFIG = {
 let allTickets = [], activeTicket = null, overdueOnly = false, refreshTimer = null;
 let repRecords = [], repFrom = null, repTo = null;
 
-// ── AUTH ──────────────────────────────────────────────────
-function checkPassword() {
-  const val = document.getElementById('pw-input').value;
-  if (val === CONFIG.ADMIN_PASSWORD) {
-    sessionStorage.setItem('fbh_admin', '1');
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('dashboard').classList.add('show');
-    renderTools();
-    populateTeam();
-    loadTickets();
-    setLastUpdated();
-    startAutoRefresh();
-    initReport();
-  } else {
-    document.getElementById('login-error').classList.add('show');
-    document.getElementById('pw-input').value = '';
-    document.getElementById('pw-input').focus();
-  }
+// ── SECURE SERVER-SIDE AUTH ────────────────────────────────
+function showAdminUI() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').classList.add('show');
+  renderTools(); populateTeam(); loadTickets(); setLastUpdated(); startAutoRefresh(); initReport();
 }
-
-function logout() {
-  sessionStorage.removeItem('fbh_admin');
+function hideAdminUI() {
   document.getElementById('dashboard').classList.remove('show');
   document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('pw-input').value = '';
-  document.getElementById('login-error').classList.remove('show');
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
 }
-
-// Auto-login if session active
-document.addEventListener('DOMContentLoaded', () => {
-  if (sessionStorage.getItem('fbh_admin') === '1') {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('dashboard').classList.add('show');
-    renderTools();
-    populateTeam();
-    loadTickets();
-    setLastUpdated();
-    startAutoRefresh();
-    initReport();
-  }
+async function checkPassword() {
+  const input = document.getElementById('pw-input');
+  const password = input.value;
+  input.value = '';
+  document.getElementById('login-error').classList.remove('show');
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({password})
+    });
+    if (!response.ok) throw new Error('Login failed');
+    showAdminUI();
+  } catch (_) { document.getElementById('login-error').classList.add('show'); input.focus(); }
+}
+async function logout() {
+  try { await fetch('/api/auth/logout', { method:'POST' }); } finally { hideAdminUI(); }
+}
+document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('pw-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') checkPassword();
   });
+  try {
+    const response = await fetch('/api/auth/me', {cache:'no-store'});
+    const data = await response.json();
+    if (data.authenticated) showAdminUI();
+  } catch (_) { /* Stay on login screen */ }
 });
 
 function setLastUpdated() {
@@ -411,35 +388,34 @@ function toggleDropdown(e, card) {
 }
 document.addEventListener('click', () => { document.querySelectorAll('.dropdown-card.open').forEach(c => c.classList.remove('open')); });
 
-// ── AIRTABLE ──────────────────────────────────────────────
-const AT_BASE = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CONFIG.AIRTABLE_TABLE)}`;
-const AT_HEADERS = { 'Authorization': `Bearer ${CONFIG.AIRTABLE_TOKEN}`, 'Content-Type': 'application/json' };
-
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function atGet(params='') {
-  // Retry on 429 (Airtable's ~5 req/sec per-base rate limit) so dashboard reads
-  // back off instead of hammering the base and worsening the limit.
-  for (let i = 0; i < 4; i++) {
-    const res = await fetch(AT_BASE+(params?'?'+params:''), {headers:AT_HEADERS});
-    if (res.status === 429) { await sleep(1500 * (i + 1)); continue; }
-    if (!res.ok) throw new Error(`Airtable ${res.status}`);
-    return res.json();
+// ── SECURE SAME-ORIGIN API ─────────────────────────────────
+async function api(path, options = {}) {
+  const result = await fetch(path, { credentials:'same-origin', cache:'no-store', ...options });
+  const data = await result.json().catch(() => ({}));
+  if (result.status === 401) { hideAdminUI(); throw new Error('Session expired. Sign in again.'); }
+  if (!result.ok) throw new Error(data.error || ('Request failed: ' + result.status));
+  return data;
+}
+async function fetchAllTickets() {
+  const records = [];
+  let offset = 0;
+  for (let page = 0; page < 2000; page++) {
+    const data = await api('/api/tickets?offset=' + offset);
+    records.push(...(data.records || []));
+    if (data.offset == null) return records;
+    const next = Number(data.offset);
+    if (!Number.isSafeInteger(next) || next <= offset) throw new Error('Invalid pagination cursor');
+    offset = next;
   }
-  throw new Error('Airtable 429');
+  throw new Error('Ticket page limit exceeded');
 }
 async function atPatch(id, fields) {
-  const res = await fetch(`${AT_BASE}/${id}`, {method:'PATCH',headers:AT_HEADERS,body:JSON.stringify({fields})});
-  if (!res.ok) {
-    let detail='';
-    try { const j=await res.json(); detail = j.error?.message || j.error?.type || ''; } catch(_){}
-    throw new Error(`Airtable ${res.status}${detail?': '+detail:''}`);
-  }
-  return res.json();
+  return api('/api/tickets/' + encodeURIComponent(id), {
+    method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({fields})
+  });
 }
 async function atDelete(id) {
-  const res = await fetch(`${AT_BASE}/${id}`, {method:'DELETE',headers:AT_HEADERS});
-  if (!res.ok) throw new Error(`Airtable error ${res.status}`);
-  return res.json();
+  return api('/api/tickets/' + encodeURIComponent(id), {method:'DELETE'});
 }
 
 // ── LOAD TICKETS ──────────────────────────────────────────
@@ -447,24 +423,10 @@ async function loadTickets(silent=false) {
   const listEl = document.getElementById('ticket-list');
   if (!silent) listEl.innerHTML = '<div class="loading-row">Loading...</div>';
   try {
-    const sf = document.getElementById('filter-status').value;
-    const ff = document.getElementById('filter-facility').value;
-    const tf = document.getElementById('filter-tool').value;
-    let filters = [];
-    if (sf) filters.push(`{Status}="${sf}"`);
-    if (ff) filters.push(`{Facility}="${ff}"`);
-    if (tf) filters.push(`{Tool}="${tf}"`);
-    let bp = 'sort[0][field]=Date Submitted&sort[0][direction]=desc';
-    if (filters.length) bp += `&filterByFormula=${encodeURIComponent(filters.length>1?`AND(${filters.join(',')})`:filters[0])}`;
-    let records=[], offset=null;
-    do {
-      let p=bp; if(offset) p+=`&offset=${offset}`;
-      const data=await atGet(p); records=records.concat(data.records||[]); offset=data.offset||null;
-      if(offset) await sleep(250);   // stay under Airtable's ~5 req/sec limit
-    } while(offset);
-    allTickets=records; renderTicketList(); updateStats(); setLastUpdated();
+    allTickets = await fetchAllTickets();
+    renderTicketList(); updateStats(); setLastUpdated();
   } catch(e) {
-    listEl.innerHTML=`<div class="empty-state"><strong>Connection error</strong><br><small style="color:#A32D2D">${e.message}</small></div>`;
+    listEl.textContent = 'Connection error: ' + e.message;
     updateStats(true);
   }
 }
@@ -474,7 +436,13 @@ async function loadTickets(silent=false) {
 function getVisibleTickets() {
   const q = (document.getElementById('filter-search')?.value || '').trim().toLowerCase();
   const asg = document.getElementById('filter-assignee')?.value || '';
+  const sf = document.getElementById('filter-status')?.value || '';
+  const ff = document.getElementById('filter-facility')?.value || '';
+  const tf = document.getElementById('filter-tool')?.value || '';
   return allTickets.filter(r => {
+    if (sf && r.fields.Status !== sf) return false;
+    if (ff && r.fields.Facility !== ff) return false;
+    if (tf && r.fields.Tool !== tf) return false;
     const f = r.fields;
     if (overdueOnly) { const a = agingInfo(f); if (!(a && !a.resolved && a.overdue)) return false; }
     if (asg === '__unassigned') { if (f['Assigned To']) return false; }
@@ -494,13 +462,13 @@ function renderTicketList() {
   if (!rows.length) { listEl.innerHTML='<div class="empty-state">No tickets match your filters.</div>'; return; }
   listEl.innerHTML = rows.map(r => {
     const f=r.fields;
-    return `<div class="ticket-item" onclick="openModal('${r.id}')">
+    return `<div class="ticket-item" onclick="openModal('${escHtml(r.id)}')">
       <div class="ticket-header">
-        <div class="ticket-title">${f.Tool||'General'} — ${f.Facility||''}</div>
-        <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
+        <div class="ticket-title">${escHtml(f.Tool||'General')} — ${escHtml(f.Facility||'')}</div>
+        <span class="badge ${badgeStatus(f.Status)}">${escHtml(f.Status||'Open')}</span>
       </div>
-      <div class="ticket-snippet">${f.Subject||''} — ${(f['Issue']||'').slice(0,80)}${(f['Issue']||'').length>80?'…':''}</div>
-      <div class="ticket-meta">${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''} · <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'}</span>${agingBadge(f)}${f.Name?` · ${f.Name}`:''}${f.Email?` · ${f.Email}`:''}${f['Assigned To']?` · 👤 ${assigneeName(f['Assigned To'])}`:''}</div>
+      <div class="ticket-snippet">${escHtml(f.Subject||'')} — ${escHtml((f['Issue']||'').slice(0,80))}${(f['Issue']||'').length>80?'…':''}</div>
+      <div class="ticket-meta">${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''} · <span class="badge ${badgePriority(f.Priority)}">${escHtml(f.Priority||'Medium')}</span>${agingBadge(f)}${f.Name?` · ${escHtml(f.Name)}`:''}${f.Email?` · ${escHtml(f.Email)}`:''}${f['Assigned To']?` · 👤 ${escHtml(assigneeName(f['Assigned To']))}`:''}</div>
     </div>`;
   }).join('');
 }
@@ -511,10 +479,7 @@ function toggleOverdue() {
   renderTicketList();
 }
 
-// Silently re-pull tickets on an interval so new/updated tickets appear without
-// a manual refresh. Skips while a ticket modal is open. Interval is deliberately
-// long (5 min) to keep the dashboard well under Airtable's ~5 req/sec per-base
-// rate limit — frequent polling was helping saturate the base.
+// Refresh the authenticated dashboard every five minutes without reloading during modal edits.
 function startAutoRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(() => {
@@ -535,16 +500,16 @@ function openModal(id) {
   const f=activeTicket.fields;
   document.getElementById('modal-title').textContent=(f.Subject||f.Tool||'Support Ticket')+' — '+(f.Facility||'');
   document.getElementById('modal-meta').innerHTML=`
-    <span class="badge ${badgeStatus(f.Status)}">${f.Status||'Open'}</span>
-    <span class="badge ${badgePriority(f.Priority)}">${f.Priority||'Medium'} priority</span>${agingBadge(f)}
-    <span>${f.Facility||''}</span>${f.Name?`<span>🧑 ${f.Name}</span>`:''}${f.Email?`<span>📧 ${f.Email}</span>`:''}${f['Contact Number']?`<span>📞 ${f['Contact Number']}</span>`:''}${f['Assigned To']?`<span>👤 ${assigneeName(f['Assigned To'])}</span>`:''}
+    <span class="badge ${badgeStatus(f.Status)}">${escHtml(f.Status||'Open')}</span>
+    <span class="badge ${badgePriority(f.Priority)}">${escHtml(f.Priority||'Medium')} priority</span>${agingBadge(f)}
+    <span>${escHtml(f.Facility||'')}</span>${f.Name?`<span>🧑 ${escHtml(f.Name)}</span>`:''}${f.Email?`<span>📧 ${escHtml(f.Email)}</span>`:''}${f['Contact Number']?`<span>📞 ${escHtml(f['Contact Number'])}</span>`:''}${f['Assigned To']?`<span>👤 ${escHtml(assigneeName(f['Assigned To']))}</span>`:''}
     <span>${f['Date Submitted']?(d=>new Date(d.getTime()+d.getTimezoneOffset()*60000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))(new Date(f['Date Submitted'])):''}</span>`;
-  document.getElementById('modal-body').innerHTML='<strong>'+(f.Tool||'')+'</strong><br><br>'+(f.Issue||'');
+  document.getElementById('modal-body').innerHTML='<strong>'+escHtml(f.Tool||'')+'</strong><br><br>'+escHtml(f.Issue||'');
   document.getElementById('modal-status').value=f.Status||'Open';
   // If assigned to someone not in the team list, add a temporary option so it shows.
   const aSel=document.getElementById('modal-assignee'), assigned=f['Assigned To']||'';
   if(assigned && !CONFIG.TEAM.some(t=>t.email===assigned)){
-    aSel.insertAdjacentHTML('beforeend',`<option value="${assigned}">${assigned}</option>`);
+    aSel.insertAdjacentHTML('beforeend',`<option value="${escHtml(assigned)}">${escHtml(assigned)}</option>`);
   }
   aSel.value=assigned;
   document.getElementById('modal-overlay').classList.add('show');
@@ -554,144 +519,42 @@ function closeModal(e) {
   document.getElementById('modal-overlay').classList.remove('show'); activeTicket=null;
 }
 async function updateTicketStatus() {
-  if(!activeTicket)return;
-  const ns=document.getElementById('modal-status').value;
-  const today=new Date().toISOString().split('T')[0];
-  const fields={Status:ns};
-  if(ns==='Resolved') fields['Resolved Date']=today;   // stamp resolution time
+  if (!activeTicket) return;
+  const status = document.getElementById('modal-status').value;
   try {
-    try { await atPatch(activeTicket.id,fields); }
-    catch(err){
-      // Base may not have a "Resolved Date" field yet — retry with just status.
-      if(/Unknown field|UNKNOWN_FIELD_NAME/i.test(err.message)) await atPatch(activeTicket.id,{Status:ns});
-      else throw err;
-    }
-    activeTicket.fields.Status=ns;
-    if(ns==='Resolved') activeTicket.fields['Resolved Date']=today;
-    showToast('Status updated.','success'); await loadTickets();
-  } catch(e){showToast('Failed to update.','error');}
+    await atPatch(activeTicket.id, {Status: status});
+    activeTicket.fields.Status = status;
+    if (status === 'Resolved') activeTicket.fields['Resolved Date'] = new Date().toISOString().slice(0,10);
+    else activeTicket.fields['Resolved Date'] = '';
+    showToast('Status updated.', 'success');
+    await loadTickets(true);
+  } catch (e) { showToast('Failed to update: ' + e.message, 'error'); }
 }
 async function assignTicket() {
-  if(!activeTicket)return;
-  const email=document.getElementById('modal-assignee').value;
+  if (!activeTicket) return;
+  const email = document.getElementById('modal-assignee').value;
   try {
-    await atPatch(activeTicket.id,{'Assigned To':email});
-    activeTicket.fields['Assigned To']=email;
+    const data = await atPatch(activeTicket.id, {'Assigned To': email});
+    activeTicket.fields['Assigned To'] = email;
     renderTicketList();
-    if(!email){showToast('Unassigned.','success');return;}
-    // Auto-send the notification email when EmailJS is configured.
-    if(CONFIG.EMAILJS.ENABLED && window.emailjs){
-      showToast(`Assigned to ${assigneeName(email)} — emailing…`);
-      try {
-        await sendAssignmentEmail(email, activeTicket.fields);
-        showToast(`Assigned & emailed ${assigneeName(email)}.`,'success');
-      } catch(err){
-        showToast('Assigned, but email failed: '+(err?.text||err?.message||'unknown'),'error');
-      }
-    } else {
-      showToast(`Assigned to ${assigneeName(email)}.`,'success');
-    }
-  } catch(e){showToast('Failed to assign — '+e.message,'error');}
+    showToast(email
+      ? (data.notification_sent ? 'Assigned & emailed.' : 'Assigned. Automatic email is not configured.')
+      : 'Unassigned.', 'success');
+  } catch (e) { showToast('Failed to assign: ' + e.message, 'error'); }
 }
 
-function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
-// Builds the subject, plaintext body, and structured HTML shared by EmailJS
-// and the Outlook fallback.
-function buildTicketEmail(email, f) {
-  const subject=`[FBH Support] ${f.Priority||'Medium'} — ${f.Subject||f.Tool||'Ticket'} (${f.Facility||''})`;
-  const body=[
-    `Hi ${assigneeName(email)||'there'},`,'',
-    'A support ticket has been assigned to you:','',
-    `Facility:     ${f.Facility||'—'}`,
-    `Tool/System:  ${f.Tool||'—'}`,
-    `Priority:     ${f.Priority||'Medium'}`,
-    `Status:       ${f.Status||'Open'}`,
-    `Submitted by: ${f.Email||'—'}`,
-    `Date:         ${f['Date Submitted']||'—'}`,'',
-    `Subject: ${f.Subject||'—'}`,'',
-    'Issue:',`${f.Issue||'—'}`,'',
-    '— Freedom Behavioral Health · Technology Hub'
-  ].join('\n');
-  const rows=[
-    ['Facility', f.Facility],
-    ['Tool / System', f.Tool],
-    ['Priority', f.Priority||'Medium'],
-    ['Status', f.Status||'Open'],
-    ['Submitted by', f.Email],
-    ['Date', f['Date Submitted']],
-  ];
-  const html=`
-<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.5">
-  <p style="margin:0 0 12px">Hi ${escHtml(assigneeName(email)||'there')},</p>
-  <p style="margin:0 0 12px">A support ticket has been assigned to you.</p>
-  <table style="border-collapse:collapse;margin:0 0 14px">
-    ${rows.map(([k,v])=>`<tr><td style="padding:4px 16px 4px 0;color:#888;white-space:nowrap;vertical-align:top">${k}</td><td style="padding:4px 0;font-weight:600">${escHtml(v||'—')}</td></tr>`).join('')}
-  </table>
-  <p style="margin:0 0 3px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Subject</p>
-  <p style="margin:0 0 14px">${escHtml(f.Subject||'—')}</p>
-  <p style="margin:0 0 3px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Issue</p>
-  <p style="margin:0;white-space:pre-wrap">${escHtml(f.Issue||'—')}</p>
-  <hr style="border:none;border-top:1px solid #e5e5e3;margin:16px 0">
-  <p style="margin:0;color:#888;font-size:12px">Freedom Behavioral Health · Technology Hub</p>
-</div>`.trim();
-  return {subject, body, html};
-}
-
-// Sends the assignment notification through EmailJS. In the EmailJS template,
-// set "To Email" to {{to_email}}, subject to {{subject}}, and the body to
-// {{{message_html}}} (TRIPLE braces = raw HTML, gives structured layout).
-// Plaintext {{message}} and individual fields are also available as fallbacks.
-function sendAssignmentEmail(email, f) {
-  const {subject, body, html}=buildTicketEmail(email, f);
-  const params={
-    to_email: email,
-    to_name: assigneeName(email)||email,
-    subject: subject,
-    message: body,
-    message_html: html,
-    cc_email: f.Email||'',
-    reply_to: f.Email||'',
-    facility: f.Facility||'',
-    tool: f.Tool||'',
-    priority: f.Priority||'Medium',
-    status: f.Status||'Open',
-    requester_email: f.Email||'',
-    requester_name: f.Name||'',
-    ref: (activeTicket && activeTicket.id) ? activeTicket.id.slice(-6).toUpperCase() : '',
-    date_submitted: f['Date Submitted']||'',
-    ticket_subject: f.Subject||'',
-    issue: f.Issue||'',
-  };
-  return emailjs.send(CONFIG.EMAILJS.SERVICE_ID, CONFIG.EMAILJS.TEMPLATE_ID, params, {publicKey:CONFIG.EMAILJS.PUBLIC_KEY});
-}
-
+// Assignment notifications are sent only from the backend.
 async function notifyAssignee() {
-  if(!activeTicket)return;
-  const email=document.getElementById('modal-assignee').value;
-  if(!email){showToast('Assign the ticket to someone first.','error');return;}
-  const f=activeTicket.fields;
-  // Preferred path: send automatically via EmailJS.
-  if(CONFIG.EMAILJS.ENABLED && window.emailjs){
-    showToast('Emailing '+(assigneeName(email)||email)+'…');
-    try {
-      await sendAssignmentEmail(email, f);
-      showToast('Emailed '+(assigneeName(email)||email)+'.','success');
-    } catch(err){
-      showToast('Email failed: '+(err?.text||err?.message||'unknown'),'error');
-    }
-    return;
-  }
-  // Fallback: open a pre-filled Outlook-on-the-web compose tab.
-  const {subject, body}=buildTicketEmail(email, f);
-  const cc=f.Email||'';
-  const url='https://outlook.office.com/mail/deeplink/compose?'+
-    'to='+encodeURIComponent(email)+
-    (cc?'&cc='+encodeURIComponent(cc):'')+
-    '&subject='+encodeURIComponent(subject)+
-    '&body='+encodeURIComponent(body);
-  window.open(url,'_blank','noopener');
-  showToast('Opening Outlook to email '+(assigneeName(email)||email)+'…');
+  if (!activeTicket) return;
+  try {
+    await api('/api/notify', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id: activeTicket.id})
+    });
+    showToast('Notification sent.', 'success');
+  } catch (e) { showToast('Notification failed: ' + e.message, 'error'); }
 }
 async function deleteTicket() {
   if(!activeTicket)return;
@@ -705,28 +568,16 @@ async function deleteTicket() {
 
 // ── AI SUMMARY ────────────────────────────────────────────
 async function runAISummary() {
-  if(!allTickets.length){showToast('No tickets to summarize.');return;}
-  const btn=document.getElementById('ai-btn'),spinner=document.getElementById('ai-spinner'),out=document.getElementById('ai-output');
-  btn.disabled=true; spinner.style.display='inline-block'; out.style.display='none';
-  const ts=allTickets.map(r=>{const f=r.fields;return `[${f.Status}] ${f.Tool} | ${f.Priority} | ${f.Facility} | ${f.Subject} | ${(f.Issue||'').slice(0,100)}`;}).join('\n');
-  const open=allTickets.filter(r=>r.fields.Status==='Open').length;
-  const prog=allTickets.filter(r=>r.fields.Status==='In Progress').length;
-  const closed=allTickets.filter(r=>r.fields.Status==='Resolved').length;
-  const urgent=allTickets.filter(r=>(r.fields.Priority==='Urgent'||r.fields.Priority==='Critical')&&r.fields.Status!=='Resolved').length;
+  const btn = document.getElementById('ai-btn'),
+        spinner = document.getElementById('ai-spinner'),
+        out = document.getElementById('ai-output');
+  btn.disabled = true; spinner.style.display = 'inline-block'; out.style.display = 'none';
   try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':CONFIG.ANTHROPIC_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,
-        system:`You are an IT support AI agent for Freedom Behavioral Health, assisting Bren Roberts (CIO). Give a concise executive-level triage summary. Plain text only, no markdown.\n\nSUMMARY\nOverall support health in 1-2 sentences.\n\nTICKET COUNTS\nOpen: X | In Progress: X | Resolved: X | Urgent: X\n\nTOP ISSUES\n2-3 most pressing issues with brief context.\n\nRECOMMENDED ACTIONS\n2-3 specific action items for today.\n\nKeep under 250 words.`,
-        messages:[{role:'user',content:`Tickets:\n\n${ts}\n\nStats: Open: ${open}, In Progress: ${prog}, Resolved: ${closed}, Urgent: ${urgent}.\n\nGive me today's triage summary.`}]
-      })
-    });
-    const data=await res.json();
-    out.textContent=data.content?.find(b=>b.type==='text')?.text||'No response from AI.';
-    out.style.display='block';
-  } catch(e){out.textContent='Error connecting to AI.';out.style.display='block';}
-  btn.disabled=false; spinner.style.display='none';
+    const data = await api('/api/triage', {method:'POST'});
+    out.textContent = data.text || 'No summary available.';
+  } catch(e) { out.textContent = e.message; }
+  out.style.display = 'block';
+  btn.disabled = false; spinner.style.display = 'none';
 }
 
 // ── REPORTS ───────────────────────────────────────────────
@@ -734,11 +585,8 @@ function repParseDate(s){ if(!s)return null; const p=String(s).slice(0,10).split
 function repWeekStart(d){ const x=new Date(d); const off=(x.getDay()+6)%7; x.setDate(x.getDate()-off); x.setHours(0,0,0,0); return x; }
 function repFmt(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
 
-async function atGetAll(){
-  let records=[], offset=null;
-  const bp='sort[0][field]=Date Submitted&sort[0][direction]=desc';
-  do { let p=bp; if(offset)p+=`&offset=${offset}`; const data=await atGet(p); records=records.concat(data.records||[]); offset=data.offset||null; if(offset) await sleep(250); } while(offset);
-  return records;
+async function atGetAll() {
+  return fetchAllTickets();
 }
 
 function setRepPreset(days){
@@ -792,7 +640,7 @@ function repHBars(obj, color){
   if(!entries.length) return '<div class="rep-note">No tickets in range.</div>';
   const max=Math.max(...entries.map(e=>e[1]),1);
   return '<div class="rep-hbars">'+entries.map(([k,v])=>
-    `<div class="rep-hbar"><div>${k}</div><div class="rep-hbar-track"><div class="rep-hbar-fill" style="width:${v/max*100}%;background:${color}"></div></div><div class="rep-hbar-num">${v}</div></div>`
+    `<div class="rep-hbar"><div>${escHtml(k)}</div><div class="rep-hbar-track"><div class="rep-hbar-fill" style="width:${v/max*100}%;background:${color}"></div></div><div class="rep-hbar-num">${v}</div></div>`
   ).join('')+'</div>';
 }
 
@@ -849,7 +697,7 @@ function exportReportCSV(){
     .sort((a,b)=>b.d-a.d);
   if(!rows.length){ showToast('No tickets in the selected range.','error'); return; }
   const cols=['Ref','Date Submitted','Name','Email','Contact Number','Facility','Tool','Priority','Status','Assigned To','Resolved Date','Subject','Issue'];
-  const esc=v=>{ const s=(v==null?'':String(v)); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const esc=v=>{ let s=(v==null?'':String(v)); if (/^[=+@\-\t\r]/.test(s)) s="'"+s; return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
   const lines=[cols.join(',')];
   rows.forEach(({r})=>{
     const f=r.fields;
