@@ -311,6 +311,10 @@ async function submitTicket() {
     for (let i = 0; i < 6; i++) {
       try { return await createRecord(f); }
       catch(e) {
+        if (e.status === 429) {                                   // rate limited — wait, retry same payload
+          await new Promise(r => setTimeout(r, Math.min(2000 * (i + 1), 6000)));
+          continue;
+        }
         if (e.status === 401 || e.status === 403) throw e;       // auth — not a field issue
         const named = OPTIONAL.find(k => k in f && (e.detail || '').includes(k));
         if (named) { delete f[named]; continue; }                // drop the named optional field
@@ -418,7 +422,10 @@ async function submitTicket() {
     document.getElementById('success-card').classList.add('show');
 
   } catch(e) {
-    showToast('Submission failed — ' + (e.message || 'please try again'), 'error');
+    const msg = e.status === 429
+      ? 'System is busy right now — please wait a few seconds and submit again.'
+      : 'Submission failed — ' + (e.message || 'please try again');
+    showToast(msg, 'error');
     btn.disabled = false;
     btn.textContent = 'Submit Ticket';
   }
