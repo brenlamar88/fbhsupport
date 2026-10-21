@@ -7,14 +7,14 @@ const ONCE = 'migration-emailjs-after-account-security-20261021:' + TO;
 const hash = x => createHash('sha256').update(x).digest();
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST' || process.env.VERCEL_ENV !== 'preview' ||
+  if (!['GET', 'POST'].includes(req.method) || process.env.VERCEL_ENV !== 'preview' ||
       process.env.VERCEL_GIT_COMMIT_REF !== 'feature/postgres-neon-migration' ||
       process.env.MIGRATION_PREVIEW_LOCK !== 'true' ||
       process.env.DISABLE_NOTIFICATIONS !== 'true')
     return respond(res, 404, { error: 'Not found' });
 
   const token = process.env.EMAILJS_ONE_TIME_TEST_TOKEN || '';
-  const received = req.headers['x-migration-test-token'];
+  const received = req.method === 'GET' ? req.query?.token : req.headers['x-migration-test-token'];
   if (token.length < 32 || typeof received !== 'string' || received.length > 200 ||
       !timingSafeEqual(hash(token), hash(received)))
     return respond(res, 404, { error: 'Not found' });
