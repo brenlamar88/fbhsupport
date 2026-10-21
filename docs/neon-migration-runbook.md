@@ -30,7 +30,13 @@ Current static HTML pages contain browser-accessible Airtable credentials; admin
 - **Completed:** Preview ticket creation succeeded via the actual Vercel API, and nine authenticated end-to-end API checks passed: pagination (686 preview records over three pages), historical reference IDs, 60 review statuses, date-range report data, PATCH status, PATCH assignee, rejection of invalid assignee, notification suppression in preview, and restoration of the synthetic ticket.
 - **Completed:** Eight unit tests and Node API syntax checks passed in an isolated environment. EmailJS provider returned HTTP 200 and the user confirmed actual delivery to `brennan@fusepros.com`.
 - **Pending:** Visual admin-browser smoke test, sign-out/re-authentication confirmation, recovery/rollback rehearsal, production first-run smoke test.
-- **Pending:** **Fresh, complete Airtable CSV export on cutover day.** Last source-export ticket submitted on 2026-10-19; the date of any later ticket or edits is unknown. Airtable's API reported a monthly quota error, so live synchronization through its API is unavailable. Do not assume the historical 685-ticket export is final.
+- **Final source-data freeze confirmed by owner (October 21):** Airtable ticket activity was paused, and the uploaded 685-ticket export ending October 19 covers all tickets. No new CSV is needed if no submissions or edits occurred after the export. Reconfirm this condition before merging. Airtable's API remains rate-limited.
+
+### Cutover rollback identifiers (do not expose credentials)
+
+- Clean Neon main backup branch: `pre-cutover-backup-2026-10-21` (`br-empty-dream-b8gt3xg0`, parent Neon `main` `br-snowy-art-b8annngz`). Snapshot was created after verifying 685 records and prior to deploying new production code.
+- Existing last-known-good Airtable Vercel deployment: `dpl_GovRJvyvHPpHb56H8ELhunNyLgZ7`, Git commit `0fc829b17ddff9e00cde96d92afb80de0fc9b388`, READY. Rolling back this deployment alone will not recover any tickets created in Neon after cutover; a reconciliation is required.
+- Do not delete Airtable data or prematurely revoke credentials until acceptance and rollback risks have been addressed. Older browser-exposed credentials should still be rotated after transition.
 
 ### Final synchronization procedure (no production traffic switch yet)
 
@@ -53,7 +59,7 @@ Current static HTML pages contain browser-accessible Airtable credentials; admin
 
 ## Remaining go-live requirements
 
-- Fresh Airtable CSV delta reconciliation and short write-freeze window.
+- Owner confirmed submissions paused and the 685-record October 19 export is complete. **Maintain the freeze** and reconfirm no record edits occurred after the export; no additional CSV is required under that condition.
 - Verify admin browser UI workflows and rehearsed rollback/restore, including any Neon-only writes.
 - Review the 60 unusual `Needs Review` records and 14 historically resolved tickets without resolution dates; original raw values remain preserved.
 - Explicit authorization to deploy the production code. Until then PR #37 remains draft and production continues on Airtable.
