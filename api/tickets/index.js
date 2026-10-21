@@ -1,7 +1,7 @@
 import { allowedMethod, bodyObject, database, handleError, rateLimit, respond, safeMutation } from '../_lib/common.js';
 import { requireAdmin } from '../_lib/auth.js';
 import { ROUTING, ticketRecord, validateAssignee, validatedNewTicket } from '../_lib/tickets.js';
-import { pushCreated, sendAssignment } from '../_lib/notify.js';
+import { pushCreated, notifyCreated } from '../_lib/notify.js';
 
 export default async function handler(req, res) {
   if (!allowedMethod(req, res, ['GET', 'POST'])) return;
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     );
     const ticket = rows[0];
     // Notifications are best effort: a mail failure must not undo a saved ticket.
-    await Promise.allSettled([sendAssignment(ticket), pushCreated(ticket)]);
+    await Promise.allSettled([notifyCreated(ticket), pushCreated(ticket)]);
     return respond(res, 201, { id: ticket.id });
   } catch (e) { return handleError(res, e); }
 }
