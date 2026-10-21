@@ -17,6 +17,9 @@ export default async function handler(req, res) {
       return respond(res, 200, { records: rows.map(ticketRecord), offset: rows.length === 250 ? String(offset + 250) : null });
     }
     if (!safeMutation(req, res)) return;
+    // A protected preview must never accept a ticket before notifications and admin login are tested.
+    if (process.env.MIGRATION_PREVIEW_LOCK === 'true')
+      return respond(res, 503, { error: 'Migration preview: ticket submissions are disabled during setup.' });
     if (Number(req.headers['content-length'] || 0) > 20000)
       return respond(res, 413, { error: 'Ticket too large' });
     if (!await rateLimit(req, 'submit-ticket', 20, 60))
