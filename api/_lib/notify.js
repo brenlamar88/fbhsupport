@@ -51,7 +51,7 @@ async function sendTemplate(template, params) {
 }
 
 export function assignmentParams(row) {
-  const ref = String(row.id).slice(-6).toUpperCase();
+  const ref = row.legacy_ticket_number == null ? String(row.id).slice(-6).toUpperCase() : String(row.legacy_ticket_number);
   const assignee = row.assigned_to || '';
   const name = row.name || '', email = row.email || '', phone = row.contact_number || '';
   const facility = row.facility || '', tool = row.tool || '', subject = row.subject || '';
@@ -100,13 +100,13 @@ export function assignmentParams(row) {
 }
 
 export async function sendAssignment(row) {
-  if (!row?.assigned_to) return false;
+  if (process.env.DISABLE_NOTIFICATIONS === 'true' || !row?.assigned_to) return false;
   return sendTemplate(config().assignment, assignmentParams(row));
 }
 
 export async function sendRequesterConfirmation(row) {
   const template = config().confirmation;
-  if (!template || !row?.email) return false; // Previous setup disabled confirmation.
+  if (process.env.DISABLE_NOTIFICATIONS === 'true' || !template || !row?.email) return false; // Previous setup disabled confirmation.
   return sendTemplate(template, {
     to_email:row.email, to_name:row.name||'', ref:String(row.id).slice(-6).toUpperCase(),
     subject:row.subject||'', facility:row.facility||'', tool:row.tool||'',
@@ -125,7 +125,7 @@ export async function notifyCreated(row) {
 }
 
 export async function pushCreated(row) {
-  if (!process.env.NTFY_TOPIC) return;
+  if (process.env.DISABLE_NOTIFICATIONS === 'true' || !process.env.NTFY_TOPIC) return;
   try {
     const headers = { 'Content-Type':'application/json' };
     if (process.env.NTFY_TOKEN) headers.Authorization = 'Bearer ' + process.env.NTFY_TOKEN;

@@ -26,7 +26,7 @@ export default async function handler(req, res) {
       return respond(res, 400, { error: 'Unsupported update field' });
     let rows;
     if ('Status' in fields) {
-      if (!['Open', 'In Progress', 'Resolved'].includes(fields.Status))
+      if (!['Open', 'In Progress', 'Resolved', 'Needs Review'].includes(fields.Status))
         return respond(res, 400, { error: 'Invalid status' });
       const resolved = fields.Status === 'Resolved';
       rows = await sql.query(

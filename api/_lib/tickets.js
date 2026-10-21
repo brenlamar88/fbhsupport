@@ -14,7 +14,8 @@ export function ticketRecord(row) {
       Name: row.name || '', Email: row.email, 'Contact Number': row.contact_number || '',
       Facility: row.facility, Tool: row.tool, Subject: row.subject, Issue: row.issue,
       Priority: row.priority, Status: row.status, 'Assigned To': row.assigned_to || '',
-      'Date Submitted': d(row.date_submitted), 'Resolved Date': d(row.resolved_date)
+      'Date Submitted': d(row.date_submitted), 'Resolved Date': d(row.resolved_date),
+      'Ticket ID': row.legacy_ticket_number == null ? null : Number(row.legacy_ticket_number)
     }
   };
 }

@@ -193,6 +193,7 @@ const CONFIG = {
         <div class="stat"><div class="stat-num num-open" id="cnt-open">—</div><div class="stat-lbl">Open</div></div>
         <div class="stat"><div class="stat-num num-progress" id="cnt-progress">—</div><div class="stat-lbl">In Progress</div></div>
         <div class="stat"><div class="stat-num num-closed" id="cnt-closed">—</div><div class="stat-lbl">Resolved</div></div>
+        <div class="stat"><div class="stat-num num-open" id="cnt-review">—</div><div class="stat-lbl">Needs Review</div></div>
       </div>
       <div class="list-controls">
         <div class="section-label" style="margin:0">All Tickets</div>
@@ -202,6 +203,7 @@ const CONFIG = {
             <option value="Open">Open</option>
             <option value="In Progress">In Progress</option>
             <option value="Resolved">Resolved</option>
+            <option value="Needs Review">Needs Review</option>
           </select>
           <select id="filter-facility" style="width:auto;font-size:12px;padding:4px 8px" onchange="loadTickets()">
             <option value="">All facilities</option>
@@ -265,6 +267,7 @@ const CONFIG = {
         <option value="Open">Open</option>
         <option value="In Progress">In Progress</option>
         <option value="Resolved">Resolved</option>
+        <option value="Needs Review">Needs Review</option>
       </select>
     </div>
     <div class="form-row">
@@ -455,6 +458,7 @@ function getVisibleTickets() {
   });
 }
 
+function ticketRef(r) { return r.fields['Ticket ID'] == null ? r.id.slice(-6).toUpperCase() : String(r.fields['Ticket ID']); }
 function renderTicketList() {
   const listEl = document.getElementById('ticket-list');
   if (!allTickets.length) { listEl.innerHTML='<div class="empty-state">No tickets found.</div>'; return; }
@@ -464,7 +468,7 @@ function renderTicketList() {
     const f=r.fields;
     return `<div class="ticket-item" onclick="openModal('${escHtml(r.id)}')">
       <div class="ticket-header">
-        <div class="ticket-title">${escHtml(f.Tool||'General')} — ${escHtml(f.Facility||'')}</div>
+        <div class="ticket-title">#${escHtml(ticketRef(r))} · ${escHtml(f.Tool||'General')} — ${escHtml(f.Facility||'')}</div>
         <span class="badge ${badgeStatus(f.Status)}">${escHtml(f.Status||'Open')}</span>
       </div>
       <div class="ticket-snippet">${escHtml(f.Subject||'')} — ${escHtml((f['Issue']||'').slice(0,80))}${(f['Issue']||'').length>80?'…':''}</div>
@@ -488,17 +492,18 @@ function startAutoRefresh() {
 }
 
 function updateStats(error=false) {
-  if(error){['cnt-open','cnt-progress','cnt-closed'].forEach(id=>document.getElementById(id).textContent='—');return;}
+  if(error){['cnt-open','cnt-progress','cnt-closed','cnt-review'].forEach(id=>document.getElementById(id).textContent='—');return;}
   document.getElementById('cnt-open').textContent=allTickets.filter(r=>r.fields.Status==='Open').length;
   document.getElementById('cnt-progress').textContent=allTickets.filter(r=>r.fields.Status==='In Progress').length;
   document.getElementById('cnt-closed').textContent=allTickets.filter(r=>r.fields.Status==='Resolved').length;
+  document.getElementById('cnt-review').textContent=allTickets.filter(r=>r.fields.Status==='Needs Review').length;
 }
 
 // ── MODAL ─────────────────────────────────────────────────
 function openModal(id) {
   activeTicket=allTickets.find(r=>r.id===id); if(!activeTicket)return;
   const f=activeTicket.fields;
-  document.getElementById('modal-title').textContent=(f.Subject||f.Tool||'Support Ticket')+' — '+(f.Facility||'');
+  document.getElementById('modal-title').textContent='#'+ticketRef(activeTicket)+' · '+(f.Subject||f.Tool||'Support Ticket')+' — '+(f.Facility||'');
   document.getElementById('modal-meta').innerHTML=`
     <span class="badge ${badgeStatus(f.Status)}">${escHtml(f.Status||'Open')}</span>
     <span class="badge ${badgePriority(f.Priority)}">${escHtml(f.Priority||'Medium')} priority</span>${agingBadge(f)}
@@ -702,7 +707,7 @@ function exportReportCSV(){
   rows.forEach(({r})=>{
     const f=r.fields;
     lines.push([
-      r.id.slice(-6).toUpperCase(), f['Date Submitted'], f.Name, f.Email, f['Contact Number'], f.Facility, f.Tool,
+      ticketRef(r), f['Date Submitted'], f.Name, f.Email, f['Contact Number'], f.Facility, f.Tool,
       f.Priority, f.Status, f['Assigned To']?assigneeName(f['Assigned To']):'', f['Resolved Date'], f.Subject, f.Issue
     ].map(esc).join(','));
   });
