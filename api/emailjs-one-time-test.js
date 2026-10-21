@@ -8,7 +8,7 @@ const BUCKET = 'migration-emailjs-once:2026-10-21:' + TARGET;
 const digest = s => createHash('sha256').update(s).digest();
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST' ||
+  if (!['GET', 'POST'].includes(req.method) ||
       process.env.VERCEL_ENV !== 'preview' ||
       process.env.VERCEL_GIT_COMMIT_REF !== 'feature/postgres-neon-migration' ||
       process.env.MIGRATION_PREVIEW_LOCK !== 'true' ||
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   }
 
   const expected = process.env.EMAILJS_ONE_TIME_TEST_TOKEN || '';
-  const supplied = req.headers['x-preview-email-test-token'];
+  const supplied = req.method === 'GET' ? req.query?.token : req.headers['x-preview-email-test-token'];
   if (expected.length < 32 || typeof supplied !== 'string' || supplied.length > 200 ||
       !timingSafeEqual(digest(expected), digest(supplied))) {
     return respond(res, 404, { error: 'Not found' });
