@@ -7,6 +7,7 @@ import listTickets from './tickets/index.js';
 const QA_ID = 'tkt_e59b30e4992b4bd59a844a5cd15bba29';
 const ONCE = 'migration-admin-route-smoke:2026-10-21:v1';
 const hash = x => createHash('sha256').update(x).digest();
+const isoDay = x => x instanceof Date ? x.toISOString().slice(0,10) : String(x||'').slice(0,10);
 
 function signedCookie() {
   const payload = Buffer.from(JSON.stringify({ exp: Date.now() + 120000 }), 'utf8').toString('base64url');
@@ -56,7 +57,7 @@ export default async function handler(req, res) {
     if (!initial || !initial.subject.startsWith('MIGRATION QA') ||
         initial.status !== 'Resolved' ||
         initial.assigned_to !== 'support@freedomhc.com' ||
-        String(initial.resolved_date).slice(0,10) !== '2026-10-21')
+        isoDay(initial.resolved_date) !== '2026-10-21')
       return respond(res, 409, {ok:false,reason:'Synthetic ticket was changed; no tests run'});
 
     const claimed = await sql.query(
@@ -95,7 +96,7 @@ export default async function handler(req, res) {
         const restored = (await sql.query('SELECT status,assigned_to,resolved_date FROM tickets WHERE id=$1',[QA_ID]))[0];
         tests.restored = a.statusCode===200 && b.statusCode===200 &&
           restored?.status===initial.status && restored?.assigned_to===initial.assigned_to &&
-          String(restored.resolved_date).slice(0,10)==='2026-10-21';
+          isoDay(restored.resolved_date)==='2026-10-21';
       } catch(e) {
         console.error('Migration QA state restoration failed',e?.message);
         tests.restored = false;
