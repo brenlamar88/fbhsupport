@@ -22,7 +22,7 @@ test('EmailJS template parameters are compatible and message HTML is escaped', (
 
 test('server calls EmailJS with original service/template and private key', async () => {
   const originalFetch = globalThis.fetch;
-  const keys=['EMAILJS_PUBLIC_KEY','EMAILJS_PRIVATE_KEY','EMAILJS_SERVICE_ID','EMAILJS_ASSIGN_TEMPLATE_ID'];
+  const keys=['EMAILJS_PUBLIC_KEY','EMAILJS_PRIVATE_KEY','EMAILJS_SERVICE_ID','EMAILJS_ASSIGN_TEMPLATE_ID','DISABLE_NOTIFICATIONS'];
   const original=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
   let captured;
   try {
@@ -30,6 +30,8 @@ test('server calls EmailJS with original service/template and private key', asyn
     process.env.EMAILJS_PRIVATE_KEY='test-private';
     process.env.EMAILJS_SERVICE_ID='service_ucspnwu';
     process.env.EMAILJS_ASSIGN_TEMPLATE_ID='template_i1zrsar';
+    // This test mocks fetch; real notifications stay disabled in the preview.
+    process.env.DISABLE_NOTIFICATIONS='false';
     globalThis.fetch=async (url,options)=>{ captured={url,options}; return {ok:true,status:200}; };
     assert.equal(await sendAssignment(ticket),true);
     assert.equal(captured.url,'https://api.emailjs.com/api/v1.0/email/send');
