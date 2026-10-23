@@ -8,6 +8,7 @@ on:
       - 'package.json'
       - 'admin.html'
       - 'index.html'
+      - 'survey-report.html'
       - '.github/workflows/validate-ticket-migration.yml'
   workflow_dispatch:
 
