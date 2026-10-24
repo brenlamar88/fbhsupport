@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>5 Star Survey Report — FBH Technology Hub</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;min-height:100vh;font-size:14px}
+  a{color:#185FA5;text-decoration:none}
+  .hub{max-width:1200px;margin:0 auto;padding:1.5rem 1rem 3rem;display:flex;flex-direction:column;gap:16px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px}
+  .header h1{font-size:20px;font-weight:600}
+  .take{font-size:13px;color:#555;margin-top:4px;max-width:760px;line-height:1.5}
+  .take b{color:#1a1a1a}
+  .meta{font-size:12px;color:#888;margin-top:4px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .btn{font:inherit;font-size:13px;padding:7px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#1a1a1a;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn:hover{background:#f0f0ee}
+  .btn.primary{background:#185FA5;border-color:#185FA5;color:#fff}
+  .btn.primary:hover{background:#0d4f8f}
+  .btn:disabled{opacity:.5;cursor:default}
+  .card{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:16px;min-width:0}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:12px}
+  .tile .lbl{font-size:12px;color:#888}
+  .tile .num{font-size:28px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+  .tile .sub{font-size:12px;color:#888;margin-top:2px}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .seg{display:inline-flex;border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff}
+  .seg button{font:inherit;font-size:12px;padding:6px 11px;border:0;background:transparent;color:#666;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:#1a1a1a;color:#fff}
+  select{font:inherit;font-size:12px;padding:6px 8px;border:1px solid #ddd;border-radius:8px;background:#fff}
+  select:disabled{opacity:.5}
+  h2{font-size:15px;font-weight:600}
+  .note{font-size:12px;color:#888;margin:3px 0 12px}
+  .chart{position:relative;min-height:240px}
+  .tip{position:absolute;pointer-events:none;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.1);padding:6px 9px;font-size:12px;white-space:nowrap;display:none;z-index:5}
+  .tip .d{color:#888;margin-bottom:2px}
+  .scroll{overflow:auto;max-height:34rem}
+  table{border-collapse:separate;border-spacing:0;font-size:12px;font-variant-numeric:tabular-nums;width:100%}
+  th,td{padding:5px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid #eee}
+  th{position:sticky;top:0;background:#fff;color:#888;font-weight:500;z-index:1}
+  th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:#fff;z-index:1}
+  thead th:first-child{z-index:3}
+  .matrix tbody tr{cursor:pointer}
+  .matrix tbody tr:hover td:first-child{text-decoration:underline}
+  .matrix tr.sel td:first-child{font-weight:700;color:#185FA5}
+  .matrix tr.all td{font-weight:600;border-top:2px solid #ddd}
+  .tot{border-right:2px solid #eee}
+  .bad{color:#A32D2D;font-weight:600}
+  .warn{color:#B45309}
+  .defs{font-size:12px;color:#666;padding-left:18px;line-height:1.6}
+  .gate{max-width:420px;margin:15vh auto;text-align:center}
+  .gate p{color:#666;margin:8px 0 16px}
+  .empty{text-align:center;color:#666;padding:2rem 1rem}
+  .msg{font-size:12px;padding:8px 10px;border-radius:8px;display:none}
+  .msg.show{display:block}
+  .msg.ok{background:#EAF3DE;color:#2F5D1E}
+  .msg.err{background:#FBEAEA;color:#A32D2D}
+  #file{display:none}
+</style>
+</head>
+<body>
+
+<div class="card gate" id="gate" hidden>
+  <div style="font-size:28px">🔒</div>
+  <h2 style="margin-top:8px">Admin sign-in required</h2>
+  <p>The survey report is only available to signed-in admins.</p>
+  <a class="btn primary" href="/admin.html">Go to admin sign-in</a>
+</div>
+
+<div class="hub" id="app" hidden>
+  <div class="header">
+    <div>
+      <h1>5 Star Survey by facility</h1>
+      <p class="take" id="takeaway"></p>
+      <p class="meta" id="meta"></p>
+    </div>
+    <div class="actions">
+      <a class="btn" href="/admin.html">← Admin</a>
+      <button class="btn" id="upload-btn" title="Upload the latest 5 Star Survey .xlsx export">Upload new export</button>
+      <button class="btn primary" id="download-btn">Download Excel</button>
+      <input type="file" id="file" accept=".xlsx,.xls,.csv">
+    </div>
+  </div>
+  <div class="msg" id="msg"></div>
+
+  <div id="report">
+    <section class="tiles">
+      <div class="card tile"><div class="lbl">Surveys · all time</div><div class="num" id="t-surveys">—</div><div class="sub">Every submission</div></div>
+      <div class="card tile"><div class="lbl">Average rating · all time</div><div class="num" id="t-avg">—</div><div class="sub">Out of 5</div></div>
+      <div class="card tile"><div class="lbl">Low-score surveys · all time</div><div class="num" id="t-low">—</div><div class="sub" id="t-lowpct"></div></div>
+      <div class="card tile"><div class="lbl">Facilities reporting</div><div class="num" id="t-fac">—</div><div class="sub">Freedom facilities named on surveys</div></div>
+    </section>
+
+    <div class="controls" style="margin-top:16px">
+      <div class="seg" role="group" aria-label="Period" id="grain"><button data-v="week">Week</button><button data-v="month">Month</button><button data-v="year">Year</button></div>
+      <div class="seg" role="group" aria-label="Measure" id="metric"><button data-v="surveys">Survey count</button><button data-v="avg">Average rating</button><button data-v="low">Low-score surveys</button></div>
+      <select id="year" aria-label="Year"></select>
+      <select id="facility" aria-label="Facility for chart"></select>
+    </div>
+
+    <section class="card" style="margin-top:16px">
+      <h2 id="chart-title">Trend</h2>
+      <p class="note">Pick a facility above, or click a row in the table below.</p>
+      <div class="chart" id="chart"></div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2 id="matrix-title">By facility</h2>
+      <p class="note">Each column is one period. Click a facility to chart it.</p>
+      <div class="scroll" id="matrix-wrap"><table class="matrix" id="matrix"></table></div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Facility totals · all time</h2>
+      <p class="note">Survey count by type, with average rating and low-score surveys.</p>
+      <div class="scroll"><table id="fac-table"></table></div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2>How these are counted</h2>
+      <ul class="defs" style="margin-top:8px">
+        <li>Average rating: the mean of every 1–5 question answered on a survey, then averaged across surveys. Surveys with no ratings are counted but not rated.</li>
+        <li>Low-score survey: any question on the survey rated 1 or 2. Low-score % is of rated surveys.</li>
+        <li>Weeks start on Monday and are labelled by that Monday's date. Periods with no surveys show blank.</li>
+        <li>Older submissions with no survey type but with ratings are counted as Discharge; those with neither are "No type". Surveys with no Freedom facility chosen are "Unassigned".</li>
+        <li>Only summary fields are stored on the server. Respondent names, comments and patient fields in the export stay in your browser.</li>
+      </ul>
+    </section>
+  </div>
+  <div class="card empty" id="empty" hidden>
+    <h2>No survey data yet</h2>
+    <p style="margin:8px 0 16px">Upload the 5 Star Survey .xlsx export to build the report.</p>
+    <button class="btn primary" id="upload-btn-2">Upload export</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const ALL = 'All facilities';
+  const COLOR = '#185FA5', BAD = '#A32D2D';
+  const state = { grain: 'month', metric: 'surveys', year: null, facility: ALL };
+  let RAW = [], AGG = null, lastImport = null;
+
+  const $ = (id) => document.getElementById(id);
+  const fmtInt = (n) => (n == null ? '' : Number(n).toLocaleString('en-US'));
+  const fmt2 = (n) => (n == null ? '' : Number(n).toFixed(2));
+  const fmtVal = (m, v) => (v == null ? '' : m === 'avg' ? fmt2(v) : fmtInt(v));
+  const METRIC = { surveys: 'Survey count', avg: 'Average rating', low: 'Low-score surveys' };
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const MONL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const utc = (s) => new Date(s + 'T00:00:00Z');
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const mondayOf = (s) => { const d = utc(s); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return iso(d); };
+  const label = (g, p) => { if (g === 'year') return p; if (g === 'month') return MON[+p.slice(5, 7) - 1] + " '" + p.slice(2, 4); const d = utc(p); return (d.getUTCMonth() + 1) + '/' + d.getUTCDate() + '/' + p.slice(2, 4); };
+  const longLabel = (g, p) => { if (g === 'year') return p; if (g === 'month') return MONL[+p.slice(5, 7) - 1] + ' ' + p.slice(0, 4); const d = utc(p); return 'Week of ' + MON[d.getUTCMonth()] + ' ' + d.getUTCDate() + ', ' + p.slice(0, 4); };
+  const niceDate = (s) => { const d = utc(s); return MON[d.getUTCMonth()] + ' ' + d.getUTCDate() + ', ' + d.getUTCFullYear(); };
+  const el = (tag, attrs = {}, text) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (text != null) n.textContent = text; return n; };
+  const svgEl = (tag, attrs = {}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+  const showMsg = (text, ok) => { const m = $('msg'); m.textContent = text; m.className = 'msg show ' + (ok ? 'ok' : 'err'); };
+
+  // ── aggregation ──────────────────────────────────────────
+  function bucket() { return { surveys: 0, scored: 0, sum: 0, low: 0, referral: 0, discharge: 0, admission: 0, unspecified: 0 }; }
+  function add(b, r) {
+    b.surveys++;
+    if (r.avg_score != null) { b.scored++; b.sum += r.avg_score; }
+    if (r.low_flag) b.low++;
+    const t = r.survey_type.toLowerCase();
+    if (t in b && t !== 'surveys') b[t]++; else b.unspecified++;
+  }
+  const fin = (b) => b && ({ ...b, avg: b.scored ? b.sum / b.scored : null, lowPct: b.scored ? b.low / b.scored : null });
+
+  function aggregate(rows) {
+    const keyFns = { year: (r) => r.date.slice(0, 4), month: (r) => r.date.slice(0, 7), week: (r) => mondayOf(r.date) };
+    const out = { year: new Map(), month: new Map(), week: new Map(), facility: new Map(), total: bucket() };
+    for (const r of rows) {
+      add(out.total, r);
+      for (const f of [r.facility, ALL]) {
+        if (f !== ALL) { if (!out.facility.has(f)) out.facility.set(f, bucket()); add(out.facility.get(f), r); }
+        for (const g of ['year', 'month', 'week']) {
+          const k = f + '|' + keyFns[g](r);
+          if (!out[g].has(k)) out[g].set(k, bucket());
+          add(out[g].get(k), r);
+        }
+      }
+    }
+    out.facilities = [...out.facility.entries()].sort((a, b) => (a[0] === 'Unassigned') - (b[0] === 'Unassigned') || b[1].surveys - a[1].surveys).map(([f]) => f);
+    out.years = [...new Set(rows.map((r) => r.date.slice(0, 4)))].sort();
+    out.first = rows.reduce((m, r) => (!m || r.date < m ? r.date : m), null);
+    out.last = rows.reduce((m, r) => (!m || r.date > m ? r.date : m), null);
+    return out;
+  }
+  const cell = (g, f, p) => fin(AGG[g].get(f + '|' + p));
+  const valueOf = (b, m) => (!b ? null : m === 'surveys' ? b.surveys : m === 'low' ? b.low : b.avg);
+
+  function periods(g, year) {
+    if (g === 'year') return AGG.years.slice();
+    let a = AGG.first, b = AGG.last;
+    if (year !== 'all') {
+      const inYear = RAW.filter((r) => r.date.slice(0, 4) === year).map((r) => r.date).sort();
+      if (!inYear.length) return [];
+      a = inYear[0]; b = inYear[inYear.length - 1];
+    }
+    const out = [];
+    if (g === 'month') {
+      let y = +a.slice(0, 4), m = +a.slice(5, 7);
+      const ey = +b.slice(0, 4), em = +b.slice(5, 7);
+      while (y < ey || (y === ey && m <= em)) { out.push(y + '-' + String(m).padStart(2, '0')); m++; if (m > 12) { m = 1; y++; } }
+    } else {
+      const d = utc(mondayOf(a)), end = utc(mondayOf(b));
+      while (d <= end) { out.push(iso(d)); d.setUTCDate(d.getUTCDate() + 7); }
+    }
+    return out;
+  }
+
+  // ── rendering ────────────────────────────────────────────
+  function renderAll() {
+    const empty = !RAW.length;
+    $('report').hidden = empty; $('empty').hidden = !empty; $('download-btn').disabled = empty;
+    $('meta').textContent = lastImport ? 'Last upload: ' + new Date(lastImport.imported_at).toLocaleString() + (lastImport.file_name ? ' · ' + lastImport.file_name : '') : '';
+    if (empty) { $('takeaway').textContent = ''; return; }
+    if (!state.year) state.year = AGG.years[AGG.years.length - 1];
+
+    const T = fin(AGG.total);
+    $('t-surveys').textContent = fmtInt(T.surveys);
+    $('t-avg').textContent = fmt2(T.avg);
+    $('t-low').textContent = fmtInt(T.low);
+    $('t-lowpct').textContent = T.lowPct == null ? '' : (T.lowPct * 100).toFixed(1) + '% of rated surveys had a 1 or 2';
+    const named = AGG.facilities.filter((f) => f !== 'Unassigned');
+    $('t-fac').textContent = fmtInt(named.length);
+    const top = named[0];
+    const best = named.map((f) => [f, fin(AGG.facility.get(f))]).filter(([, b]) => b.scored >= 15).sort((a, b) => b[1].avg - a[1].avg)[0];
+    const tk = $('takeaway'); tk.replaceChildren();
+    tk.append(el('b', {}, fmtInt(T.surveys)), ' surveys from ' + niceDate(AGG.first) + ' to ' + niceDate(AGG.last) + '. ');
+    if (top) tk.append(el('b', {}, top), ' has the most responses (' + fmtInt(AGG.facility.get(top).surveys) + ')');
+    if (best) tk.append('; ', el('b', {}, best[0]), ' rates highest at ' + fmt2(best[1].avg) + ' (facilities with 15+ rated surveys).');
+    else tk.append('.');
+
+    document.querySelectorAll('#grain button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === state.grain)));
+    document.querySelectorAll('#metric button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === state.metric)));
+    const ys = $('year');
+    ys.replaceChildren(new Option('All years', 'all'), ...AGG.years.map((y) => new Option(y, y)));
+    ys.value = state.year; ys.disabled = state.grain === 'year';
+    const fs = $('facility');
+    fs.replaceChildren(new Option(ALL, ALL), ...AGG.facilities.map((f) => new Option(f, f)));
+    if (state.facility !== ALL && !AGG.facility.has(state.facility)) state.facility = ALL;
+    fs.value = state.facility;
+
+    const yr = state.grain === 'year' ? 'all' : state.year;
+    const span = yr === 'all' ? 'all years' : yr;
+    const ps = periods(state.grain, yr);
+    $('chart-title').textContent = { week: 'Weekly', month: 'Monthly', year: 'Yearly' }[state.grain] + ' ' + METRIC[state.metric].toLowerCase() + ' · ' + state.facility + ' · ' + span;
+    $('matrix-title').textContent = METRIC[state.metric] + ' by facility, by ' + state.grain + ' · ' + span;
+    drawChart(ps);
+    drawMatrix(ps, yr);
+    drawFacTable();
+  }
+
+  function drawChart(ps) {
+    const box = $('chart'); box.replaceChildren();
+    const W = box.clientWidth; if (!W || !ps.length) return;
+    const H = 240, mt = 10, mb = 26, g = state.grain, m = state.metric;
+    const vals = ps.map((p) => { const b = cell(g, state.facility, p); return { p, b, v: valueOf(b, m) }; });
+    const nums = vals.map((d) => d.v).filter((v) => v != null);
+    let lo = 0, hi = Math.max(1, ...nums);
+    if (m === 'avg') { lo = Math.min(3, Math.floor(Math.min(...nums, 3))); hi = 5; }
+    else { const step = Math.pow(10, Math.floor(Math.log10(hi))) / 2; hi = Math.ceil(hi / step) * step; }
+    const y = (v) => mt + (H - mb - mt) * (1 - (v - lo) / (hi - lo));
+    const ticks = []; const n = 4; for (let i = 0; i <= n; i++) ticks.push(lo + (hi - lo) * i / n);
+    const tf = (t) => (m === 'avg' ? t.toFixed(1) : (Number.isInteger(t) ? fmtInt(t) : ''));
+    const svg = svgEl('svg', { width: '100%', viewBox: `0 0 ${W} ${H}` }); svg.style.display = 'block'; box.appendChild(svg);
+    const measure = (txt) => { const t = svgEl('text', { 'font-size': '11' }); t.textContent = txt; svg.appendChild(t); const w = t.getComputedTextLength(); t.remove(); return w; };
+    const ml = Math.max(...ticks.map((t) => measure(tf(t)))) + 10;
+    const step = (W - 4 - ml) / ps.length, bw = Math.min(32, step * 0.75);
+    const xc = (i) => ml + step * i + step / 2;
+    for (const t of ticks) {
+      if (!tf(t)) continue;
+      svg.appendChild(svgEl('line', { x1: ml, x2: W - 4, y1: y(t), y2: y(t), stroke: '#eee' }));
+      const tx = svgEl('text', { x: ml - 8, y: y(t), dy: '0.32em', 'text-anchor': 'end', 'font-size': '11', fill: '#888' }); tx.textContent = tf(t); svg.appendChild(tx);
+    }
+    const lw = Math.max(...ps.map((p) => measure(label(g, p)))) + 10;
+    const every = Math.max(1, Math.ceil(lw / step));
+    ps.forEach((p, i) => {
+      if ((ps.length - 1 - i) % every) return;
+      const half = measure(label(g, p)) / 2;
+      const tx = svgEl('text', { x: Math.min(W - 2 - half, Math.max(half, xc(i))), y: H - 8, 'text-anchor': 'middle', 'font-size': '11', fill: '#888' }); tx.textContent = label(g, p); svg.appendChild(tx);
+    });
+    svg.appendChild(svgEl('line', { x1: ml, x2: W - 4, y1: y(lo), y2: y(lo), stroke: '#ccc' }));
+    const hl = svgEl('rect', { fill: '#000', opacity: 0, y: mt, height: H - mb - mt, width: step }); svg.appendChild(hl);
+    if (m === 'avg') {
+      let d = '', pen = false;
+      vals.forEach((v, i) => { if (v.v == null) { pen = false; return; } d += (pen ? 'L' : 'M') + xc(i) + ',' + y(v.v); pen = true; });
+      svg.appendChild(svgEl('path', { d, fill: 'none', stroke: COLOR, 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+      vals.forEach((v, i) => { if (v.v != null) svg.appendChild(svgEl('circle', { cx: xc(i), cy: y(v.v), r: 3, fill: v.v < 4 ? BAD : COLOR })); });
+    } else {
+      vals.forEach((v, i) => { if (v.v) svg.appendChild(svgEl('rect', { x: xc(i) - bw / 2, width: bw, y: y(v.v), height: y(0) - y(v.v), rx: Math.min(4, bw / 2), fill: m === 'low' ? BAD : COLOR })); });
+    }
+    const tip = el('div', { class: 'tip' }); box.appendChild(tip);
+    const hit = svgEl('rect', { x: ml, y: 0, width: W - 4 - ml, height: H, fill: 'transparent' }); svg.appendChild(hit);
+    hit.addEventListener('mousemove', (e) => {
+      const r = svg.getBoundingClientRect(); const sx = W / r.width;
+      const mx = (e.clientX - r.left) * sx, my = (e.clientY - r.top) * sx;
+      const i = Math.max(0, Math.min(ps.length - 1, Math.floor((mx - ml) / step)));
+      const v = vals[i];
+      hl.setAttribute('x', ml + step * i); hl.setAttribute('opacity', 0.05);
+      tip.replaceChildren(el('div', { class: 'd' }, longLabel(g, v.p)), el('div', {}, 'Surveys: ' + fmtInt(v.b ? v.b.surveys : 0)), el('div', {}, 'Avg rating: ' + (v.b && v.b.avg != null ? fmt2(v.b.avg) : '—')), el('div', {}, 'Low-score: ' + fmtInt(v.b ? v.b.low : 0)));
+      tip.style.display = 'block';
+      const px = mx / sx, py = my / sx; const tw = tip.offsetWidth;
+      tip.style.left = Math.max(0, px + 12 + tw > r.width ? px - tw - 12 : px + 12) + 'px';
+      tip.style.top = Math.max(0, py - 30) + 'px';
+    });
+    hit.addEventListener('mouseleave', () => { tip.style.display = 'none'; hl.setAttribute('opacity', 0); });
+  }
+
+  function drawMatrix(ps, yr) {
+    const t = $('matrix'); t.replaceChildren();
+    const g = state.grain, m = state.metric;
+    const useYear = g !== 'year' && yr !== 'all';
+    const hr = t.createTHead().insertRow();
+    hr.append(el('th', {}, 'Facility'), el('th', { class: 'tot' }, useYear ? yr + ' total' : 'All time'));
+    for (const p of ps) hr.append(el('th', { title: longLabel(g, p) }, label(g, p)));
+    let max = 1;
+    for (const f of AGG.facilities) for (const p of ps) { const v = valueOf(cell(g, f, p), m); if (v != null && m !== 'avg') max = Math.max(max, v); }
+    const tb = t.createTBody();
+    for (const f of [...AGG.facilities, ALL]) {
+      const tr = tb.insertRow(); tr.dataset.fac = f;
+      if (f === ALL) tr.className = 'all';
+      if (f === state.facility) tr.classList.add('sel');
+      tr.insertCell().textContent = f;
+      const totB = useYear ? cell('year', f, yr) : fin(f === ALL ? AGG.total : AGG.facility.get(f));
+      const tc = tr.insertCell(); tc.className = 'tot'; const tv = valueOf(totB, m); tc.textContent = fmtVal(m, tv);
+      if (m === 'avg' && tv != null) tc.classList.add(tv < 4 ? 'bad' : tv < 4.5 ? 'warn' : 'ok');
+      for (const p of ps) {
+        const td = tr.insertCell(); const v = valueOf(cell(g, f, p), m);
+        if (v == null) continue;
+        td.textContent = fmtVal(m, v);
+        if (m === 'avg') { if (v < 4) td.classList.add('bad'); else if (v < 4.5) td.classList.add('warn'); }
+        else if (f !== ALL && v > 0) td.style.background = (m === 'low' ? 'rgba(163,45,45,' : 'rgba(24,95,165,') + (0.08 + 0.42 * v / max).toFixed(2) + ')';
+      }
+    }
+    const key = g + '|' + yr;
+    if (drawMatrix.key !== key) { const w = $('matrix-wrap'); w.scrollLeft = w.scrollWidth; drawMatrix.key = key; }
+  }
+
+  function drawFacTable() {
+    const t = $('fac-table'); t.replaceChildren();
+    const hr = t.createTHead().insertRow();
+    ['Facility', 'Surveys', 'Avg rating', 'Low-score', 'Low-score %', 'Referral', 'Discharge', 'Admission', 'No type'].forEach((h) => hr.append(el('th', {}, h)));
+    const tb = t.createTBody();
+    for (const f of [...AGG.facilities, ALL]) {
+      const b = fin(f === ALL ? AGG.total : AGG.facility.get(f));
+      const tr = tb.insertRow(); if (f === ALL) tr.style.fontWeight = '600';
+      const cells = [f, fmtInt(b.surveys), fmt2(b.avg), fmtInt(b.low), b.lowPct == null ? '' : (b.lowPct * 100).toFixed(1) + '%', fmtInt(b.referral), fmtInt(b.discharge), fmtInt(b.admission), fmtInt(b.unspecified)];
+      cells.forEach((c, i) => { const td = tr.insertCell(); td.textContent = c; if (i === 2 && b.avg != null && b.avg < 4.5) td.classList.add(b.avg < 4 ? 'bad' : 'warn'); });
+    }
+  }
+
+  // ── Excel download ───────────────────────────────────────
+  function downloadExcel() {
+    if (!window.XLSX) return showMsg('The Excel library did not load. Check your connection and reload the page.', false);
+    const wb = XLSX.utils.book_new();
+    const totals = [['Facility', 'Surveys', 'Avg Rating', 'Low-Score Surveys', 'Low-Score %', 'Referral', 'Discharge', 'Admission', 'No Type']];
+    for (const f of [...AGG.facilities, ALL]) {
+      const b = fin(f === ALL ? AGG.total : AGG.facility.get(f));
+      totals.push([f, b.surveys, b.avg == null ? null : +b.avg.toFixed(2), b.low, b.lowPct == null ? null : +b.lowPct.toFixed(4), b.referral, b.discharge, b.admission, b.unspecified]);
+    }
+    const ws0 = XLSX.utils.aoa_to_sheet([['5 Star Survey — facility totals (all time)'], ['Surveys ' + niceDate(AGG.first) + ' – ' + niceDate(AGG.last) + '. Avg rating = mean of answered 1–5 questions per survey; low-score = any question rated 1 or 2.'], [], ...totals]);
+    for (let r = 4; r < 4 + totals.length - 1; r++) { const c = ws0[XLSX.utils.encode_cell({ r, c: 4 })]; if (c && c.v != null) c.z = '0.0%'; }
+    ws0['!cols'] = [{ wch: 18 }, ...Array(8).fill({ wch: 12 })];
+    XLSX.utils.book_append_sheet(wb, ws0, 'Facility Totals');
+    for (const g of ['year', 'month', 'week']) {
+      const ps = periods(g, 'all');
+      const aoa = [['5 Star Survey by facility, by ' + g + (g === 'week' ? ' (weeks start Monday)' : '')], []];
+      for (const [m, title] of [['surveys', 'Survey count'], ['avg', 'Average rating (1-5)'], ['low', 'Low-score surveys (any question rated 1 or 2)']]) {
+        aoa.push([title]);
+        aoa.push(['Facility', 'All time', ...ps.map((p) => (g === 'week' ? 'Wk of ' + p : p))]);
+        for (const f of [...AGG.facilities, ALL]) {
+          const tv = valueOf(fin(f === ALL ? AGG.total : AGG.facility.get(f)), m);
+          aoa.push([f, m === 'avg' && tv != null ? +tv.toFixed(2) : tv, ...ps.map((p) => { const v = valueOf(cell(g, f, p), m); return m === 'avg' && v != null ? +v.toFixed(2) : v; })]);
+        }
+        aoa.push([]);
+      }
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [{ wch: 18 }, { wch: 9 }, ...ps.map(() => ({ wch: g === 'week' ? 14 : 9 }))];
+      ws['!freeze'] = { xSplit: 2 };
+      XLSX.utils.book_append_sheet(wb, ws, 'By ' + g[0].toUpperCase() + g.slice(1));
+    }
+    const data = [['Submission Date', 'Freedom Facility', 'Survey Type', 'Avg Rating', 'Low Score', 'Week Start (Mon)', 'Referring Facility', 'Submission ID']];
+    for (const r of RAW) data.push([r.date, r.facility, r.survey_type, r.avg_score, r.low_flag ? 1 : 0, mondayOf(r.date), r.referring_facility, r.id]);
+    const wsd = XLSX.utils.aoa_to_sheet(data);
+    wsd['!cols'] = [{ wch: 13 }, { wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 9 }, { wch: 15 }, { wch: 36 }, { wch: 22 }];
+    XLSX.utils.book_append_sheet(wb, wsd, 'Data');
+    XLSX.writeFile(wb, '5_Star_Survey_by_Facility_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  }
+
+  // ── upload ───────────────────────────────────────────────
+  const TEXT_FIELDS = ['Submission ID', 'Submission Date', 'Freedom Facility', 'Choose a survey', "Your Facility's Name"];
+  const SKIP_NUMERIC = ['Patient Age', 'Last Update Date'];
+  async function upload(file) {
+    if (!window.XLSX) return showMsg('The Excel library did not load. Check your connection and reload the page.', false);
+    showMsg('Reading ' + file.name + '…', true);
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: null, raw: true });
+      if (!rows.length || !('Submission Date' in rows[0]) || !('Freedom Facility' in rows[0])) throw new Error('That file does not look like a 5 Star Survey export (no Submission Date / Freedom Facility columns).');
+      // Only the fields the report needs leave the browser: no names, comments or patient details.
+      const slim = rows.map((r) => {
+        const o = {};
+        for (const [k, v] of Object.entries(r)) {
+          if (TEXT_FIELDS.includes(k)) o[k] = v;
+          else if (typeof v === 'number' && !SKIP_NUMERIC.includes(k) && Number.isInteger(v) && v >= 1 && v <= 5) o[k] = v;
+        }
+        return o;
+      });
+      const res = await fetch('/api/reports/surveys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: file.name, rows: slim }) });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401) return showGate();
+      if (!res.ok) throw new Error(body.error || 'Upload failed (' + res.status + ')');
+      showMsg('Uploaded ' + fmtInt(body.imported) + ' surveys (' + fmtInt(body.added) + ' new' + (body.skipped ? ', ' + fmtInt(body.skipped) + ' rows skipped' : '') + '). ' + fmtInt(body.total) + ' surveys on file.', true);
+      await load();
+    } catch (e) { showMsg(e.message || String(e), false); }
+  }
+
+  // ── load ─────────────────────────────────────────────────
+  function showGate() { $('app').hidden = true; $('gate').hidden = false; }
+  async function load() {
+    const res = await fetch('/api/reports/surveys', { cache: 'no-store' });
+    if (res.status === 401) return showGate();
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { $('app').hidden = false; return showMsg(body.error || 'Could not load survey data (' + res.status + ').', false); }
+    RAW = body.rows || []; lastImport = body.lastImport; AGG = RAW.length ? aggregate(RAW) : null;
+    $('app').hidden = false; $('gate').hidden = true;
+    renderAll();
+  }
+
+  document.querySelectorAll('#grain button').forEach((b) => b.addEventListener('click', () => { state.grain = b.dataset.v; renderAll(); }));
+  document.querySelectorAll('#metric button').forEach((b) => b.addEventListener('click', () => { state.metric = b.dataset.v; renderAll(); }));
+  $('year').addEventListener('change', (e) => { state.year = e.target.value; renderAll(); });
+  $('facility').addEventListener('change', (e) => { state.facility = e.target.value; renderAll(); });
+  $('matrix').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-fac]'); if (tr) { state.facility = tr.dataset.fac; renderAll(); $('chart').scrollIntoView({ behavior: 'smooth', block: 'center' }); } });
+  $('download-btn').addEventListener('click', downloadExcel);
+  for (const id of ['upload-btn', 'upload-btn-2']) $(id).addEventListener('click', () => $('file').click());
+  $('file').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) upload(f); });
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => AGG && renderAll(), 150); });
+
+  fetch('/api/auth/me', { cache: 'no-store' }).then((r) => r.json()).then((d) => (d.authenticated ? load() : showGate())).catch(showGate);
+})();
+</script>
+</body>
+</html>
